@@ -51,6 +51,12 @@ void HardwareResource::occupy(
             if (node->type() == ChakraNodeType::COMM_RECV_NODE) {
                 return;
             }
+            if (node->type() == ChakraNodeType::MEM_LOAD_NODE ||
+                node->type() == ChakraNodeType::MEM_STORE_NODE) {
+                // remote-memory ops hold no issue slot: their concurrency
+                // is governed by the remote-memory backend (read credits)
+                return;
+            }
             assert(num_in_flight_gpu_comm_ops == 0);
             ++num_in_flight_gpu_comm_ops;
             ++num_gpu_comms;
@@ -73,6 +79,10 @@ void HardwareResource::release(
             this->gpu_ops_node.erase(node->id());
         } else {
             if (node->type() == ChakraNodeType::COMM_RECV_NODE) {
+                return;
+            }
+            if (node->type() == ChakraNodeType::MEM_LOAD_NODE ||
+                node->type() == ChakraNodeType::MEM_STORE_NODE) {
                 return;
             }
             --num_in_flight_gpu_comm_ops;
@@ -98,13 +108,14 @@ bool HardwareResource::is_available(
                 return false;
             }
         } else {
+            if (node->type() == ChakraNodeType::MEM_LOAD_NODE ||
+                node->type() == ChakraNodeType::MEM_STORE_NODE) {
+                return true;
+            }
             if (num_in_flight_gpu_comm_ops == 0) {
                 return true;
             } else {
                 if (node->type() == ChakraNodeType::COMM_RECV_NODE) {
-                    return true;
-                }
-                if (num_in_flight_gpu_comm_ops == 0) {
                     return true;
                 }
                 return false;

@@ -1,0 +1,6 @@
+{
+    "memory-type": "LOOM_PEER_READS",
+    "remote-mem-latency": 5000,
+    "remote-mem-bw": 47,
+    "read-credits": 32
+}
