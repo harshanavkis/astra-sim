@@ -118,6 +118,55 @@ def plot_regime():
     save(fig, "regime.pdf")
 
 
+def plot_matrix():
+    rows = read("matrix.csv")
+    if not rows:
+        return
+    topos = sorted({r["topology"] for r in rows})
+    colls = sorted({r["collective"] for r in rows})
+    size = "16"  # representative size for the headline grid
+    fig, axes = plt.subplots(1, len(topos), figsize=(3 * len(topos), 3),
+                             sharey=True)
+    for ax, topo in zip(axes, topos):
+        gains = []
+        for c in colls:
+            sel = {r["system"]: int(r["wall_cycles"]) for r in rows
+                   if r["topology"] == topo and r["collective"] == c
+                   and r["size_mb"] == size}
+            gains.append(100 * (sel["b1_gpu_rdma"] - sel["loom"]) / sel["b1_gpu_rdma"]
+                         if "loom" in sel and "b1_gpu_rdma" in sel else 0)
+        colors = ["#70ad47" if g >= 0 else "#c00000" for g in gains]
+        ax.bar(range(len(colls)), gains, 0.6, color=colors)
+        ax.axhline(0, color="grey", lw=0.8)
+        ax.set_xticks(range(len(colls)),
+                      [c.replace("_", "\n") for c in colls], fontsize=7)
+        ax.set_title(topo, fontsize=9)
+    axes[0].set_ylabel(f"Loom gain over B1 (%), {size}MB")
+    save(fig, "matrix.pdf")
+
+
+def plot_apps():
+    rows = read("apps.csv")
+    if not rows:
+        return
+    labels, gains = [], []
+    apps = sorted({(r["app"], r["ranks"]) for r in rows}, key=lambda t: (t[0], int(t[1])))
+    for app, ranks in apps:
+        sel = {r["system"]: int(r["wall_cycles"]) for r in rows
+               if r["app"] == app and r["ranks"] == ranks}
+        if "loom" in sel and "b1_gpu_rdma" in sel:
+            labels.append(f"{app}\n{ranks} ranks")
+            gains.append(100 * (sel["b1_gpu_rdma"] - sel["loom"]) / sel["b1_gpu_rdma"])
+    fig, ax = plt.subplots(figsize=(4.5, 3))
+    colors = ["#70ad47" if g >= 0 else "#c00000" for g in gains]
+    ax.bar(range(len(labels)), gains, 0.6, color=colors)
+    ax.axhline(0, color="grey", lw=0.8)
+    ax.set_xticks(range(len(labels)), labels, fontsize=7)
+    ax.set_ylabel("Loom gain over B1 (%)")
+    ax.set_title("Applications (published shapes, roofline)", fontsize=9)
+    save(fig, "apps.pdf")
+
+
 if __name__ == "__main__":
     os.makedirs(RES, exist_ok=True)
     plot_smoke()
@@ -125,3 +174,5 @@ if __name__ == "__main__":
     plot_credits()
     plot_tpipe()
     plot_regime()
+    plot_matrix()
+    plot_apps()
