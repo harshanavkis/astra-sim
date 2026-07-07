@@ -58,6 +58,25 @@ the first real backend change, in `congestion_aware/Device`.)
   CSV): the break-even point against B1 falls out directly. Note the ring
   all-to-all amplifies hop count; rerun with `direct` per fairness rule F2.
 
+## Workload provenance
+
+Three tiers, all Chakra ET format (the simulator sees no difference):
+
+1. **Controlled synthetics** (`workload/gen_*.py`): the communication pattern
+   is exact (MoE dispatch/compute/combine, victim/incast, reads) and every
+   parameter is an explicit knob - use for sweeps and mechanism experiments.
+2. **STG-generated realistic workloads** (`fetch_stg.sh` +
+   `gen_stg_workloads.sh`): astra-sim's own generator (STAGE) derives the
+   full compute+comm graph from model dimensions and a parallelization
+   (DP/TP/PP/SP/EP incl. `--model_type moe`); shapes set from published
+   configs (DeepSeek-V3, Mixtral, GPT-3). Use roofline system configs
+   (`system/*_roofline.json`) - STG compute nodes carry num_ops, and the
+   SM-reservation baseline is expressed by scaling `peak-perf` (989 vs 839
+   TFLOPS = 20/132 SMs reserved).
+3. **Captured PyTorch ETs** (upgrade path, needs GPUs): chakra_trace_link +
+   chakra_converter on a real DeepEP/NCCL run - the gold standard for the
+   camera-ready; same file format, drop-in.
+
 ## Placeholder constants (until testbed calibration)
 
 All Loom-favoring constants are placeholders to be replaced by measurements
