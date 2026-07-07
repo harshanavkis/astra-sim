@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net">
+  <diagram name="Page-1" id="loom-sim-topology">
+    <mxGraphModel dx="800" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Rack 1 -->
+        <mxCell id="r1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontSize=10;fillColor=#f5f5f5;dashed=1;fontColor=#333333;strokeColor=#666666" value="" vertex="1">
+          <mxGeometry x="200" y="420" width="190" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="r1l" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;align=center" value="&lt;b&gt;&lt;u&gt;Rack 1&lt;/u&gt;&lt;/b&gt;" vertex="1">
+          <mxGeometry x="200" y="418" width="190" height="12" as="geometry" />
+        </mxCell>
+        <mxCell id="x1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EFEFEF;strokeColor=#666666;fontSize=8;fontStyle=1" value="XPU 1" vertex="1">
+          <mxGeometry x="212" y="444" width="76" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="x2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EFEFEF;strokeColor=#666666;fontSize=8;fontStyle=1" value="XPU M" vertex="1">
+          <mxGeometry x="302" y="444" width="76" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="t1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;spacing=0;fontSize=9;strokeWidth=1;spacingTop=-3;fontStyle=1" value="Loom ToR Switch" vertex="1">
+          <mxGeometry x="212" y="510" width="166" height="38" as="geometry" />
+        </mxCell>
+        <mxCell id="t1a" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontSize=8;fontFamily=Courier" value="+ t_pipe per traversal" vertex="1">
+          <mxGeometry x="220" y="526" width="150" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="d0" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=8;align=center;fontStyle=2" value="dim0: Switch (rack fabric)" vertex="1">
+          <mxGeometry x="200" y="556" width="190" height="12" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="x1" target="t1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endSize=4;startSize=4;startArrow=classic;startFill=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="x2" target="t1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endSize=4;startSize=4;startArrow=classic;startFill=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Rack N -->
+        <mxCell id="r2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontSize=10;fillColor=#f5f5f5;dashed=1;fontColor=#333333;strokeColor=#666666" value="" vertex="1">
+          <mxGeometry x="440" y="420" width="190" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="r2l" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;align=center" value="&lt;b&gt;&lt;u&gt;Rack N&lt;/u&gt;&lt;/b&gt;" vertex="1">
+          <mxGeometry x="440" y="418" width="190" height="12" as="geometry" />
+        </mxCell>
+        <mxCell id="x3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EFEFEF;strokeColor=#666666;fontSize=8;fontStyle=1" value="XPU 1" vertex="1">
+          <mxGeometry x="452" y="444" width="76" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="x4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EFEFEF;strokeColor=#666666;fontSize=8;fontStyle=1" value="XPU M" vertex="1">
+          <mxGeometry x="542" y="444" width="76" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="t2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;spacing=0;fontSize=9;strokeWidth=1;spacingTop=-3;fontStyle=1" value="Loom ToR Switch" vertex="1">
+          <mxGeometry x="452" y="510" width="166" height="38" as="geometry" />
+        </mxCell>
+        <mxCell id="t2a" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontSize=8;fontFamily=Courier" value="+ t_pipe per traversal" vertex="1">
+          <mxGeometry x="460" y="526" width="150" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="x3" target="t2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endSize=4;startSize=4;startArrow=classic;startFill=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="x4" target="t2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endSize=4;startSize=4;startArrow=classic;startFill=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Inter-ToR -->
+        <mxCell id="e5" edge="1" parent="1" source="t1" target="t2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endSize=4;startSize=4;startArrow=classic;startFill=1;fontSize=8;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="295" y="600" />
+              <mxPoint x="535" y="600" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d1" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=8;align=center;fontStyle=2" value="dim1: Switch (inter-ToR Ethernet) — bandwidth × goodput" vertex="1">
+          <mxGeometry x="290" y="604" width="250" height="12" as="geometry" />
+        </mxCell>
+        <mxCell id="cfg" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontSize=8;fontFamily=Courier;fillColor=#f5f5f5;strokeColor=#666666" value="npus_count: [ M, N ] · topology: [ Switch, Switch ]" vertex="1">
+          <mxGeometry x="290" y="630" width="250" height="16" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
