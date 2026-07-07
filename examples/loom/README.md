@@ -37,34 +37,36 @@ the first real backend change, in `congestion_aware/Device`.)
   - `baseline_gpu_rdma.json` — B1, GPU-initiated RDMA (IBGDA-like)
   - `baseline_cpu_proxy.json` — B2, CPU proxy thread
   - `ideal_rdma.json` — B3, zero-overhead upper bound
-- `workload/gen_moe_alltoall.py` — MoE expert-parallel iteration
-  (dispatch all-to-all → expert compute → combine all-to-all), with the
-  SM-reservation scaling flag for baseline traces.
 - `workload/gen_p2p_patterns.py` — single-flow / incast / victim+aggressor
-  patterns; `workload/gen_read_pattern.py` — independent peer reads;
-  `workload/gen_llm_hybrid.py` — hybrid-parallel LLM iteration (text format
-  + in-tree converter).
+  stimulus; `workload/gen_read_pattern.py` — independent peer reads.
+  These are *microbenchmark stimulus* in the style of the repo's own
+  `examples/workload/microbenchmarks/generator_scripts/` (iperf-like flow
+  patterns with no real-trace equivalent), NOT application workloads.
 - `remote_memory/loom_peer_reads.json` — LOOM_PEER_READS credit-capped read
   model (submodule extension).
 - `system/loom_1d.json` — 1-dim variant for single-switch (flat) runs; the
   congestion-aware backend supports 1-dim topologies only.
 - `figures/` — drawio sources explaining the setup (layer stack + topology).
-- `run_smoke.sh` — end-to-end smoke run (Loom vs baselines, small config).
+- `run_smoke.sh` — end-to-end smoke run (Loom vs baselines) on the repo's
+  shipped all-to-all microbenchmark ETs.
 - `run_victim.sh` — Sim-V1 victim-flow isolation: VOQ (default egress) vs
   `switch_egress: shared_fifo` (head-of-line strawman, congestion-aware
   submodule extension). Verified: victim FCT identical to solo under VOQ,
   3.2x inflated under shared FIFO.
 - `run_sweep_tpipe.sh` — S-1 sensitivity sweep (t_pipe vs completion time,
-  CSV): the break-even point against B1 falls out directly. Note the ring
-  all-to-all amplifies hop count; rerun with `direct` per fairness rule F2.
+  CSV) on an STG-generated MoE workload: the break-even point against B1
+  falls out directly. Note the ring all-to-all amplifies hop count; rerun
+  with `direct` per fairness rule F2.
 
 ## Workload provenance
 
 Three tiers, all Chakra ET format (the simulator sees no difference):
 
-1. **Controlled synthetics** (`workload/gen_*.py`): the communication pattern
-   is exact (MoE dispatch/compute/combine, victim/incast, reads) and every
-   parameter is an explicit knob - use for sweeps and mechanism experiments.
+1. **Microbenchmark stimulus only** (`workload/gen_*.py`): victim/incast/
+   single-flow and read patterns for mechanism experiments (isolation,
+   credits) - the same category as the repo's shipped generator_scripts.
+   Application workloads are NEVER hand-authored here: MoE and dense LLM
+   traces come exclusively from tiers 2 and 3.
 2. **STG-generated realistic workloads** (`fetch_stg.sh` +
    `gen_stg_workloads.sh`): astra-sim's own generator (STAGE) derives the
    full compute+comm graph from model dimensions and a parallelization
