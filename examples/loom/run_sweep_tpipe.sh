@@ -10,8 +10,7 @@ RM=examples/remote_memory/analytical/no_memory_expansion.json
 RACKS=4; XPUS=4
 
 examples/loom/fetch_stg.sh >/dev/null
-[ -f /tmp/stg_moe/moe.json ] || examples/loom/gen_stg_workloads.sh moe /tmp/stg_moe \
-    --num_stacks 2 --batch 8 --seq 512 >/dev/null 2>&1
+[ -f /tmp/stg_moe/moe.json ] || examples/loom/gen_stg_workloads.sh moe /tmp/stg_moe >/dev/null 2>&1
 
 run() {  # $1 sysjson, $2 netyml -> wall cycles
     $BIN --workload-configuration=/tmp/stg_moe/moe \

@@ -30,3 +30,4 @@ build/astra_htsim/build/
 # runs
 runs
 extern/graph_frontend/stage/
+examples/loom/results/

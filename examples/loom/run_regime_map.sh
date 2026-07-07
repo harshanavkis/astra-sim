@@ -14,8 +14,7 @@ BIN=build/astra_analytical/build/bin/AstraSim_Analytical_Congestion_Unaware
 RM=examples/remote_memory/analytical/no_memory_expansion.json
 
 examples/loom/fetch_stg.sh >/dev/null 2>&1
-[ -f /tmp/stg_moe/moe.json ] || examples/loom/gen_stg_workloads.sh moe /tmp/stg_moe \
-    --num_stacks 2 --batch 8 --seq 512 >/dev/null 2>&1
+[ -f /tmp/stg_moe/moe.json ] || examples/loom/gen_stg_workloads.sh moe /tmp/stg_moe >/dev/null 2>&1
 python3 examples/loom/gen_network_config.py --mode loom --racks 4 --xpus-per-rack 4 --pipe-ns 500 -o /tmp/net_loom.yml
 python3 examples/loom/gen_network_config.py --mode baseline --racks 4 --xpus-per-rack 4 -o /tmp/net_b1.yml
 
