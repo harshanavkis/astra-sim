@@ -12,18 +12,18 @@ Work lives in THREE git repos; only some of it is pushed anywhere:
 | Repo | Branch | Pushed? |
 |---|---|---|
 | `~/loom-paper` | master (Overleaf-synced) | tex yes; **design-docs/, loom-drawio/, *.md are UNTRACKED** — copy them explicitly |
-| `~/astra-sim` (fork `harshanavkis/astra-sim`) | **`loom-sim`** (12 commits over upstream 518bd51) | **NO — local only** |
-| `~/astra-sim/extern/network_backend/analytical` (submodule) | **`loom-sim`** (1 commit: egress policy) | **NO — local only; no fork exists** |
-| `~/astra-sim/extern/remote_memory_backend/analytical` (submodule) | **`loom-sim`** (1 commit: LOOM_PEER_READS) | **NO — local only; no fork exists** |
+| `~/astra-sim` (fork `harshanavkis/astra-sim`) | **`loom-sim`** | **push before migrating**: `git push -u origin loom-sim` |
+| submodule `extern/network_backend/analytical` | `loom-sim` | YES → fork `harshanavkis/astra-network-analytical` |
+| submodule `extern/remote_memory_backend/analytical` | `loom-sim` | YES → fork `harshanavkis/astra-memory-analytical` |
 
-To migrate: either push `loom-sim` to the astra-sim fork and create forks
-for the two submodules (then update `.gitmodules`), or:
+`.gitmodules` points at the two forks (https), so on a new server:
 ```bash
-cd ~/astra-sim && git bundle create /tmp/astra-loom.bundle loom-sim
-(cd extern/network_backend/analytical && git bundle create /tmp/net-loom.bundle loom-sim)
-(cd extern/remote_memory_backend/analytical && git bundle create /tmp/mem-loom.bundle loom-sim)
+git clone -b loom-sim https://github.com/harshanavkis/astra-sim.git
+cd astra-sim && git submodule update --init   # pulls the loom-sim commits from the forks
 # plus: tar the untracked loom-paper files (design-docs/, loom-drawio/, *.md)
 ```
+(Local submodule push remotes stay ssh; do not run `git submodule sync`
+or it overwrites them with the https URLs.)
 
 ## 1. What Loom is (design invariants — violate none of these)
 
