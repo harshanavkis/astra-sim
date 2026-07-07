@@ -62,7 +62,7 @@ def build_flows(args):
     if args.pattern == "victim":
         flows = [(0, args.victim_dst)]
         flows += [(a, args.congested_dst) for a in range(1, 1 + args.aggressors)]
-        return flows
+        return flows  # aggressor flows use --aggressor-size-kb
     raise ValueError(args.pattern)
 
 
@@ -75,7 +75,8 @@ def generate(args):
     # per-rank node lists
     nodes = defaultdict(list)
     for tag, (src, dst) in enumerate(flows, start=1):
-        size = args.size_kb * 1024
+        is_aggressor = args.pattern == "victim" and tag > 1
+        size = (args.aggressor_size_kb if is_aggressor else args.size_kb) * 1024
         send_dep = recv_dep = None
         for it in range(args.iters):
             snd = p2p_node(len(nodes[src]), COMM_SEND_NODE, src, dst, size, tag, send_dep)
@@ -110,6 +111,8 @@ def main():
     p.add_argument("--racks", type=int, default=2)
     p.add_argument("--xpus-per-rack", type=int, default=4)
     p.add_argument("--size-kb", type=int, default=1024)
+    p.add_argument("--aggressor-size-kb", type=int, default=4096,
+                   help="flow size for aggressors in the victim pattern")
     p.add_argument("--iters", type=int, default=8)
     p.add_argument("--src", type=int, default=0)
     p.add_argument("--dst", type=int, default=None)
