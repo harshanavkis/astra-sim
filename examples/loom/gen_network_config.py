@@ -31,7 +31,9 @@ def build_yaml(args) -> str:
     if args.mode == "loom":
         lat0 = args.fabric_latency + args.pipe_ns
         lat1 = args.net_latency + 2 * args.pipe_ns  # source + destination ToR
-        bw1 = args.net_bw * args.loom_goodput
+        # equal-wires provisioning: ToR uplink aggregate = M NICs' aggregate,
+        # divided by the explicit oversubscription factor
+        bw1 = args.net_bw * args.loom_goodput / args.uplink_oversub
     elif args.mode == "baseline":
         lat0 = args.fabric_latency
         lat1 = args.net_latency
@@ -74,6 +76,9 @@ def main():
                    help="Loom encap goodput factor at the run's message mix")
     p.add_argument("--roce-goodput", type=float, default=0.90,
                    help="baseline RoCE goodput factor")
+    p.add_argument("--uplink-oversub", type=float, default=1.0,
+                   help="Loom ToR uplink oversubscription vs per-XPU NICs "
+                        "(1.0 = equal wires; sweep per eval plan S-6)")
     p.add_argument("-o", "--output", default="-")
     args = p.parse_args()
 

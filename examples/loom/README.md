@@ -79,6 +79,22 @@ Three tiers, all Chakra ET format (the simulator sees no difference):
    chakra_converter on a real DeepEP/NCCL run - the gold standard for the
    camera-ready; same file format, drop-in.
 
+## Topology fairness (what is and is not modeled)
+
+- Baseline shape = rail-optimized cluster (GPU i of each rack on rail switch
+  i, one NIC per GPU); Loom shape = rack fabric through the ToR + ToR
+  uplinks. Identical physical rates on both (equal-wires framing; Loom also
+  deletes M NICs per rack, so equal-cost would favor Loom - stated in prose,
+  not modeled).
+- Loom ToR uplink aggregate defaults to the baseline's M NICs
+  (`--uplink-oversub 1.0`); oversubscription is an explicit sweep (S-6).
+- KNOWN GAP, generous to Loom: a Loom XPU's single fabric port carries both
+  intra- and cross-rack traffic, but AstraSim's orthogonal dims let dim1
+  traffic bypass dim0 capacity (which matches the baseline's separate NIC,
+  not Loom). Shared-edge contention belongs to the congestion tier; until
+  then, bound it by charging cross-rack traffic to both dims in a worst-case
+  variant.
+
 ## Placeholder constants (until testbed calibration)
 
 All Loom-favoring constants are placeholders to be replaced by measurements
