@@ -110,10 +110,55 @@ Phases 0–5); each is swept in the sensitivity plan regardless.
 | B2 endpoint-delay | 3000 ns | testbed CPU-verbs post+poll baseline |
 | B1 SM reservation | 20 of 132 SMs (DeepSeek-V3) | swept {8, 20, 32} |
 
-## Running (Docker)
+## Running everything
+
+**One command (host side)** — builds the Docker image if missing, runs the
+full suite, renders plots:
 
 ```bash
-docker build -t astra-sim:loom /path/to/astra-sim   # official Dockerfile
-docker run --rm -v /path/to/astra-sim:/app/astra-sim astra-sim:loom \
-    bash -c "./build/astra_analytical/build.sh && examples/loom/run_smoke.sh"
+examples/loom/run_all_docker.sh
+# CSVs + PDFs -> examples/loom/results/   (root-owned; chown if needed)
 ```
+
+**Manual steps** (all sim commands run inside the official image):
+
+```bash
+# 1. image (once; official Dockerfile at repo root)
+docker build -t astra-sim:loom .
+
+# 2. shell inside the image with the repo mounted
+docker run --rm -it -v $PWD:/app/astra-sim astra-sim:loom bash
+
+# 3. build backends (once per source change)
+./build/astra_analytical/build.sh -t all       # or congestion_unaware / congestion_aware
+
+# 4. individual experiments (each prints CSV to stdout)
+examples/loom/run_smoke.sh          # endpoint models, shipped all-to-all ETs
+examples/loom/run_victim.sh         # Sim-V1 VOQ vs shared-FIFO (congestion_aware)
+examples/loom/run_sweep_credits.sh  # S-5 read-credit cap
+examples/loom/run_sweep_tpipe.sh    # S-1 break-even (STG Mixtral MoE)
+examples/loom/run_regime_map.sh     # gain vs comm-boundedness
+examples/loom/run_matrix.sh         # patterns x sizes x topologies x systems
+examples/loom/run_apps.sh           # Mixtral MoE + GPT-3 dense at 2 scales
+examples/loom/run_all.sh            # all of the above -> results/*.csv
+
+# 5. plots (matplotlib; pip3 install -q matplotlib inside the image)
+python3 examples/loom/plot_results.py   # results/*.csv -> results/*.pdf
+```
+
+**Workloads** (regenerate at other scales):
+
+```bash
+examples/loom/fetch_stg.sh                                 # pin STG once
+examples/loom/gen_stg_workloads.sh moe   /tmp/moe64 --dp 2 --tp 4 --ep 8
+examples/loom/gen_stg_workloads.sh dense /tmp/gpt64 --dp 4 --tp 4 --pp 4
+python3 examples/loom/workload/gen_p2p_patterns.py --pattern incast --out /tmp/i
+```
+
+**Network/system configs**: `gen_network_config.py --mode {loom,baseline,ideal}`
+(knobs: `--pipe-ns --loom-goodput --uplink-oversub --dim1-topology`);
+system JSONs in `system/` (roofline variants for STG workloads).
+
+Notes: STG needs `tqdm` (fetch_stg.sh installs it); results/ is gitignored;
+sweeps accept env overrides (e.g. `KS="1 10" run_regime_map.sh`,
+`SIZES="16" COLLS="all_to_all" run_matrix.sh`).
