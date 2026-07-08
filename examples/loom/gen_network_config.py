@@ -32,9 +32,11 @@ def build_yaml(args) -> str:
         # in-rack: the Loom ToR IS the rack switch (whose forwarding is
         # already inside fabric_latency); Loom adds only the table lookups
         lat0 = args.fabric_latency + args.pipe_local_ns
-        # source + destination ToR pipelines + the RoCE stack the Loom
-        # switch itself uses (baselines' published numbers include their NIC)
-        lat1 = args.net_latency + args.roce_stack_ns + 2 * args.pipe_ns
+        # two ToR traversals; each traversal's pipeline = Loom logic
+        # (validate/match/encap or decap/bounds/translate) + the transport
+        # (RoCE) processing inside the same switch -- one composite cost,
+        # which is exactly what testbed T3 measures per traversal
+        lat1 = args.net_latency + 2 * (args.pipe_ns + args.roce_stack_ns)
         # equal-wires provisioning: ToR uplink aggregate = M NICs' aggregate,
         # divided by the explicit oversubscription factor
         bw1 = args.net_bw * args.loom_goodput / args.uplink_oversub
@@ -88,9 +90,12 @@ def main():
                    help="Loom encap goodput factor at the run's message mix")
     p.add_argument("--roce-goodput", type=float, default=0.95,
                    help="baseline RoCE goodput factor")
-    p.add_argument("--roce-stack-ns", type=float, default=700.0,
-                   help="RoCE/NIC stack processing paid by the Loom switch "
-                        "on the cross-rack route (NIC-class; testbed T3)")
+    p.add_argument("--roce-stack-ns", type=float, default=350.0,
+                   help="transport (RoCE) processing per ToR traversal, "
+                        "INSIDE the switch pipeline (2x350 = NIC-class "
+                        "total). Testbed T3 measures pipe+stack together "
+                        "(the substrate RoCE ping-pong floor separates "
+                        "them); set 0 if --pipe-ns already includes it")
     p.add_argument("--rdma-init-ns", type=float, default=2400.0,
                    help="baseline per-op RDMA initiation cost after the wire, "
                         "folded into dim1 (B1 GPU-initiated 2400 -> ~3us "

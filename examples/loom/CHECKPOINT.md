@@ -1,6 +1,6 @@
 # CHECKPOINT — Loom project state
 
-> **Last updated: 2026-07-08 (rules 8-9: paper repo off limits; artifact-branch plan).** LIVING DOCUMENT — overwritten in place with
+> **Last updated: 2026-07-08 (roce-stack composed into pipeline term; rules 8-9).** LIVING DOCUMENT — overwritten in place with
 > every change (user mandate), alongside `CODE-MAP.md`. Written for session
 > restart on a possibly different server: read this first; it contains
 > everything needed to resume. Lives in the astra-sim repo (branch
@@ -108,7 +108,7 @@ GPT-3 175B); `799ed6c` matrix + apps; `7705a9c` README.
 Key modeling decisions:
 - Loom switch = constants folded into per-dim latency/BW (HGX-validated
   technique): dim0 + `t_pipe_local` (~50 ns lookup adder; the ToR IS the
-  rack switch), dim1 + 2×`t_pipe` + 700 ns RoCE stack, goodput on dim1.
+  rack switch), dim1 + 2×(`t_pipe` + 350 ns RoCE stack) per traversal — transport processing composes INTO the pipeline (no separate RDMA initiation in Loom; avoids double counting when T3 measures the composite), goodput on dim1.
   All network constants anchored to published/validated numbers (README
   table); only t_pipe/t_pipe_local + coalescing curve are testbed-owned.
   Endpoint costs route-split: store-issue 10 ns (HGX-validated) for ALL
