@@ -1,9 +1,11 @@
-# CHECKPOINT — Loom project state (2026-07-07)
+# CHECKPOINT — Loom project state
 
-> Written for session restart on a possibly different server. Read this
-> first; it contains everything needed to resume. Lives in the astra-sim
-> repo (branch `loom-sim`, next to `examples/loom/README.md` with the run
-> instructions); companion design docs live in `loom-paper/design-docs/`.
+> **Last updated: 2026-07-08.** LIVING DOCUMENT — overwritten in place with
+> every change (user mandate), alongside `CODE-MAP.md`. Written for session
+> restart on a possibly different server: read this first; it contains
+> everything needed to resume. Lives in the astra-sim repo (branch
+> `loom-sim`, next to `examples/loom/README.md` with the run instructions);
+> companion design docs live in `loom-paper/design-docs/`.
 
 ## 0. MIGRATION WARNING (read before moving servers)
 
@@ -123,7 +125,12 @@ Key modeling decisions:
   (Mixtral/GPT-3) + stimulus generators (victim/incast/reads, iperf
   category). NO hand-authored application workloads.
 
-## 5. Results so far (ALL with placeholder constants — directional only)
+**Standing docs:** `examples/loom/CODE-MAP.md` = running summary of all
+code and its real-system correspondence; `CLAUDE.md` at repo root = working
+rules. BOTH this checkpoint and CODE-MAP are overwritten in place on every
+change.
+
+## 5. Results so far (constants now published/validated; t_pipe swept)
 
 - Victim isolation: solo 77,024 = VOQ 77,024 (bit-identical) vs shared-FIFO
   249,954 cycles (3.2×). The isolation money-plot twin works.
