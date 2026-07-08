@@ -25,38 +25,67 @@ New code in this package is therefore **config generation only**; the
 simulator is unmodified. (Congestion-tier VOQ modeling — phase S4 — will be
 the first real backend change, in `congestion_aware/Device`.)
 
-## Files
+## Files and folders (what each is)
 
-- `gen_network_config.py` — emits 2-dim network YAMLs (dim0 = rack scale-up
-  fabric through the ToR, dim1 = inter-ToR Ethernet), folding the pipe
-  latency and goodput factor per mode (`loom` / `baseline` / `ideal`).
-- `network/` — generated YAMLs (committed for reproducibility; regenerate
-  with the commands in each file's header comment).
-- `system/` — endpoint models as system JSONs:
-  - `loom.json` — endpoint-delay 0 (a store is the whole per-message cost)
-  - `baseline_gpu_rdma.json` — B1, GPU-initiated RDMA (IBGDA-like)
-  - `baseline_cpu_proxy.json` — B2, CPU proxy thread
-  - `ideal_rdma.json` — B3, zero-overhead upper bound
-- `workload/gen_p2p_patterns.py` — single-flow / incast / victim+aggressor
-  stimulus; `workload/gen_read_pattern.py` — independent peer reads.
-  These are *microbenchmark stimulus* in the style of the repo's own
-  `examples/workload/microbenchmarks/generator_scripts/` (iperf-like flow
-  patterns with no real-trace equivalent), NOT application workloads.
-- `remote_memory/loom_peer_reads.json` — LOOM_PEER_READS credit-capped read
-  model (submodule extension).
-- `system/loom_1d.json` — 1-dim variant for single-switch (flat) runs; the
-  congestion-aware backend supports 1-dim topologies only.
-- `figures/` — drawio sources explaining the setup (layer stack + topology).
-- `run_smoke.sh` — end-to-end smoke run (Loom vs baselines) on the repo's
-  shipped all-to-all microbenchmark ETs.
-- `run_victim.sh` — Sim-V1 victim-flow isolation: VOQ (default egress) vs
-  `switch_egress: shared_fifo` (head-of-line strawman, congestion-aware
-  submodule extension). Verified: victim FCT identical to solo under VOQ,
-  3.2x inflated under shared FIFO.
-- `run_sweep_tpipe.sh` — S-1 sensitivity sweep (t_pipe vs completion time,
-  CSV) on an STG-generated MoE workload: the break-even point against B1
-  falls out directly. Note the ring all-to-all amplifies hop count; rerun
-  with `direct` per fairness rule F2.
+```
+examples/loom/
+├── README.md                  this file: run guide, constants, VOQ explainer
+├── CHECKPOINT.md              LIVING: full project state for session restart
+├── CODE-MAP.md                LIVING: every artifact -> real-system mapping
+├── ANALYTICAL-MODEL.md        LIVING: equations, constants + decisions ledgers
+│
+├── gen_network_config.py      network-YAML generator (loom/baseline/ideal);
+│                              per-stage pipeline params, one per hw block
+├── network/                   generated YAMLs, committed as samples (header
+│                              comment = exact command to regenerate)
+├── system/                    endpoint models (system JSONs):
+│   ├── loom.json                Loom: endpoint-delay 10ns, 2-dim collectives
+│   ├── loom_1d.json             1-dim variant (congestion-aware runs)
+│   ├── loom_roofline.json       + roofline peak-perf 989 (STG workloads)
+│   ├── baseline_gpu_rdma.json   B1 (its rdma-init lives in the net YAML)
+│   ├── baseline_gpu_rdma_roofline.json  B1 + peak-perf 839 (20/132 SM tax)
+│   ├── baseline_cpu_proxy.json  B2 (run with --rendezvous-protocol=true)
+│   └── ideal_rdma.json          B3 upper bound
+├── remote_memory/
+│   └── loom_peer_reads.json   LOOM_PEER_READS read-credit config
+│                              (finite cap; >= outstanding loads = infinite)
+│
+├── fetch_stg.sh               pins STG (workload generator) into extern/
+├── gen_stg_workloads.sh       moe/dense presets w/ published model dims
+├── workload/
+│   ├── gen_p2p_patterns.py    single/incast/victim flow stimulus (iperf-
+│   │                          category microbenchmarks, NOT applications)
+│   └── gen_read_pattern.py    independent MEM_LOADs (credit experiments)
+│
+├── run_smoke.sh               endpoint models on shipped all-to-all ETs
+├── run_victim.sh              Sim-V1: VOQ vs shared-FIFO isolation
+├── run_sweep_credits.sh       S-5: read-credit cap sweep (1..64 + infinite)
+├── run_sweep_tpipe.sh         S-1: source-pipeline break-even vs B1
+├── run_regime_map.sh          gain vs comm-boundedness (SM ceiling)
+├── run_matrix.sh              collectives x sizes x topologies x systems
+├── run_apps.sh                Mixtral MoE + GPT-3 dense at two scales
+├── run_all.sh                 whole suite -> results/*.csv (in Docker)
+├── run_all_docker.sh          one-command host entry (build image, run, plot)
+├── plot_results.py            results/*.csv -> results/*.pdf
+├── results/                   CSVs + PDFs (gitignored; root-owned by Docker)
+└── figures/                   drawio sources: sim setup stack, topology,
+                               per-route latency breakdown
+```
+
+Code living OUTSIDE this folder (the simulator extensions):
+
+- `extern/network_backend/analytical` (fork, branch `loom-sim`) — switch
+  egress policy: `EgressPolicy {PerDestination = VOQ (stock), SharedFifo =
+  HoL strawman}`; `switch_egress:` YAML key (Link/Device/Topology/
+  NetworkParser/Helper).
+- `extern/remote_memory_backend/analytical` (fork, branch `loom-sim`) —
+  `LOOM_PEER_READS` memory type: per-NPU read-credit cap.
+- `astra-sim/workload/HardwareResource.cc` (this repo) — MEM_LOAD/STORE
+  hold no GPU issue slot (fabric credits, not issue serialization, are the
+  limit).
+- `/CLAUDE.md` (repo root) — standing working rules.
+
+See CODE-MAP.md for what each piece models in the real system.
 
 ## Workload provenance
 

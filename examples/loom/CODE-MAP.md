@@ -3,7 +3,7 @@
 > **Keep this updated with every commit that adds/changes code.** For each
 > artifact: what was written, and how it corresponds to the real Loom system
 > (the paper's design; eventually the Coyote/U280 prototype and an ASIC ToR).
-> Last updated: 2026-07-08 (README VOQ explainer + egress toggle + knob list).
+> Last updated: 2026-07-08 (README file/folder outline).
 
 ## 1. Simulator extensions (C++)
 
