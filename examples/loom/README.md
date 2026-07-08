@@ -186,6 +186,42 @@ Docker (matrix dominates). Each experiment writes one CSV to `results/`;
 | apps | 8 (4 configs × Loom/B1) | `apps.csv` (app, ranks, system, wall, exposed) | `apps.pdf` gain bars | Mixtral MoE +7.5/+15%, GPT-3 +5% (published shapes) |
 | *(optional)* victim | 3 (solo/voq/shared_fifo) | `victim.csv` (case, victim_fct_cycles) | `victim.pdf` bars | standalone demo only; not in run_all |
 
+### Why each experiment exists
+
+- **smoke** — the cheapest end-to-end correctness check that all four
+  endpoint models run and order sensibly on workloads we did not author
+  (the repo's shipped ETs). It is the canary: if a model change breaks
+  semantics, smoke shifts first. Being comm-only, it also honestly shows
+  Loom does NOT win when there is no compute to reclaim.
+- **sweep_credits** — demonstrates the read-credit mechanism (paper §6.3)
+  is implemented faithfully: the exact 1x/2x/…/64x scaling and the ∞ point
+  collapsing onto 64 are arithmetic predictions; matching them exactly is
+  the verification. Reads carry no performance claim, so this is a
+  mechanism proof, not a benchmark.
+- **sweep_tpipe** — the design-headroom question ("how much switch latency
+  can Loom afford?") and the FPGA→ASIC bridge: the FPGA will measure one
+  point in the slowest plausible technology; the curve is what makes the
+  claim robust to realization, and it is the frame the measured dot gets
+  placed on (paper fig: break-even). Also the anti-cherry-picking
+  guarantee for the t_pipe placeholder (fairness rule F3: swept or
+  measured).
+- **regime_map** — locates WHERE Loom wins and sets the paper's claim
+  structure: gains approach the SM-reclamation ceiling when compute-bound
+  and fall to parity when comm-bound. It exists to prevent overclaiming —
+  it is the experiment that told us this is a reclamation-plus-parity
+  paper, not a bulk-speedup paper.
+- **matrix** — the generalization check reviewers ask for ("does it only
+  win on one workload/topology?"): 4 traffic patterns × 3 sizes × 4
+  topologies × 4 systems. Its job is coverage and finding the negative
+  cells, not producing a headline.
+- **apps** — the headline: end-to-end iteration time on published model
+  shapes (Mixtral 8x7B, GPT-3 175B) at two scales, Loom vs the strongest
+  baseline. This is the number the abstract will cite.
+- **victim** *(optional)* — insurance, not evidence: the paper claims no
+  congestion isolation (moved to Discussion); this demo exists so a
+  Discussion challenge ("do known egress disciplines actually handle your
+  hazard?") can be answered with a same-day run instead of a rebuild.
+
 ## Running everything
 
 **One command (host side)** — builds the Docker image if missing, runs the
