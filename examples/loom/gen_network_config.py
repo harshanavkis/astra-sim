@@ -36,7 +36,9 @@ def build_yaml(args) -> str:
         bw1 = args.net_bw * args.loom_goodput / args.uplink_oversub
     elif args.mode == "baseline":
         lat0 = args.fabric_latency
-        lat1 = args.net_latency
+        # RDMA initiation is paid per scale-out op only (a dim1 crossing);
+        # in-rack peer access is a plain store, same as Loom's
+        lat1 = args.net_latency + args.rdma_init_ns
         bw1 = args.net_bw * args.roce_goodput
     else:  # ideal
         lat0 = args.fabric_latency
@@ -76,6 +78,10 @@ def main():
                    help="Loom encap goodput factor at the run's message mix")
     p.add_argument("--roce-goodput", type=float, default=0.90,
                    help="baseline RoCE goodput factor")
+    p.add_argument("--rdma-init-ns", type=float, default=1500.0,
+                   help="baseline per-op RDMA initiation cost, folded into "
+                        "dim1 (B1 GPU-initiated ~1500, B2 CPU proxy ~2500; "
+                        "perftest/IBGDA-class placeholders, swept)")
     p.add_argument("--dim1-topology", choices=("Switch", "Ring", "FullyConnected"),
                    default="Switch", help="inter-ToR topology (default Switch)")
     p.add_argument("--uplink-oversub", type=float, default=1.0,
