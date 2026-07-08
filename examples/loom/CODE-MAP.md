@@ -3,7 +3,7 @@
 > **Keep this updated with every commit that adds/changes code.** For each
 > artifact: what was written, and how it corresponds to the real Loom system
 > (the paper's design; eventually the Coyote/U280 prototype and an ASIC ToR).
-> Last updated: 2026-07-08 (VOQ vs read-credits disambiguation in README).
+> Last updated: 2026-07-08 (paper moved congestion to Discussion; victim demo demoted).
 
 ## 1. Simulator extensions (C++)
 
@@ -21,13 +21,13 @@ network-YAML key `switch_egress: shared_fifo`.
 
 **Real-system correspondence:** the stock model (each egress link has its
 own private queue) *is* the Loom ToR's **per-destination transmit queues**
-(design §6.4, VOQ): a congested destination grows only its own queue. The
-new `SharedFifo` mode is the **strawman** — a shared-buffer switch whose
-head-of-line chunk blocks everything behind it, i.e., what the rack fabric's
-link-level credit backpressure would do without VOQs. The victim experiment
-toggles exactly the design's claim: isolation is a property of the egress
-discipline, nothing else (verified: victim FCT identical to solo under VOQ;
-3.2× inflated under SharedFifo).
+(paper §6.2 transport, presented as standard deep-buffer engineering; the
+isolation claim moved to the paper's Discussion section, 2026-07-08, with
+no quantitative claim made). The `SharedFifo` mode is the **strawman** — a
+shared-buffer switch whose head-of-line chunk blocks everything behind it.
+The victim experiment (FCT identical to solo under VOQ; 3.2× under
+SharedFifo) now *supports the discussion*, demonstrating that known egress
+disciplines handle the hazard — it is not a headline result.
 
 **Limitation:** backend is 1-dim only, so the ToR under test is modeled as
 a flat switch — this isolates the egress mechanism but cannot show
@@ -126,7 +126,7 @@ speed (not trace durations) is the faithful model.
 | Script | Stresses (design §) | Current result (anchored constants) |
 |---|---|---|
 | `run_smoke.sh` | endpoint models on shipped ETs | sanity ordering; comm-only so no SM term |
-| `run_victim.sh` | §6.4 VOQ isolation | solo = VOQ (77,024 = 77,024), SharedFifo 3.2× |
+| `run_victim.sh` | discussion-supporting demo (congestion moved out of design) | solo = VOQ (77,024 = 77,024), SharedFifo 3.2× |
 | `run_sweep_credits.sh` | §6.3 read credits | exact linear concurrency scaling |
 | `run_sweep_tpipe.sh` | §6.1 switch cost (break-even) | break-even ≈ 1.6 µs; 500 ns placeholder wins |
 | `run_regime_map.sh` | §2 #4 SM reclamation vs comm-boundedness | gain → SM ceiling (~15%) compute-bound; parity comm-bound |

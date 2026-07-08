@@ -1,6 +1,6 @@
 # CHECKPOINT — Loom project state
 
-> **Last updated: 2026-07-08 (VOQ vs read-credits disambiguation in README).** LIVING DOCUMENT — overwritten in place with
+> **Last updated: 2026-07-08 (paper moved congestion to Discussion; victim demo demoted).** LIVING DOCUMENT — overwritten in place with
 > every change (user mandate), alongside `CODE-MAP.md`. Written for session
 > restart on a possibly different server: read this first; it contains
 > everything needed to resume. Lives in the astra-sim repo (branch
@@ -145,6 +145,14 @@ change.
 - STRATEGIC READ: claim = SM reclamation (≤15%) + bulk parity + latency/
   isolation/unification. NOT a bulk-speedup paper. Comm-bound losses are a
   ring-algorithm artifact until F2 is checked.
+
+**Paper restructure (2026-07-08):** design goal #6 removed (five goals
+now); §6.4 deleted; per-destination queues folded into §6.2 as standard
+deep-buffer engineering (no claim); new Discussion section carries the
+congestion hazard + body-of-work citations (PFC spreading, VOQ classics,
+Jericho, 802.1Qcz, BFC); intro contribution 4 and eval summary dropped the
+isolation promise. Victim experiments (testbed T5 / Sim-V1) demoted to
+discussion-supporting demos.
 
 ## 6. Next steps (priority order)
 

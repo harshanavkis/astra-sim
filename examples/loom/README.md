@@ -228,9 +228,15 @@ head blocks everything behind it whenever *its* destination is busy — one
 congested destination stalls traffic to every healthy one (head-of-line
 blocking). Virtual Output Queuing (VOQ), the standard switch-design remedy,
 gives each destination its own egress queue, so a congested destination
-grows only its own backlog. In Loom this is the design's **per-destination
-transmit queues** (paper §6.4): the mechanism behind the isolation claim
-that one slow remote peer must not stall an XPU's traffic to others.
+grows only its own backlog. In Loom this is the **per-destination transmit
+queues**, now presented in the paper as standard deep-buffer switch
+engineering (§6.2 transport); the congestion-isolation *claim* was
+deliberately moved out of the design into the paper's Discussion section
+(2026-07-08): the hazard is the PCIe instance of the documented PFC
+congestion-spreading pathology, a body of switch-design work exists for it
+(VOQ classics, Jericho-class deep buffers, IEEE 802.1Qcz, BFC), and the
+paper claims nothing quantitative about it. The victim experiment below is
+therefore a *discussion-supporting demo*, not a headline result.
 
 **Not to be confused with read credits** (paper §6.3, simulated by
 `LOOM_PEER_READS`): both defend the fabric's finite credit/tag space, but
