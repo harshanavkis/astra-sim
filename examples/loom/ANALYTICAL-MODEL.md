@@ -1,6 +1,6 @@
 # The analytical model, number by number (inspection document)
 
-> **Last updated: 2026-07-08 (D11 edge legs, D12 t_pipe=200; four-case walkthrough added).** Living document (CLAUDE.md rule 1). Every
+> **Last updated: 2026-07-08 (dims-are-alternatives clarification; D11/D12).** Living document (CLAUDE.md rule 1). Every
 > constant and modeling decision in the simulation, with its value,
 > decomposition, what it includes/excludes per system, provenance, and the
 > reasoning — so each can be inspected and vetoed individually.
@@ -45,6 +45,28 @@ bandwidth: dim0 = 64 GB/s (all)   dim1 = 50 GB/s × goodput
            goodput: Loom 0.947 · baselines 0.95 · ideal 1.0
 endpoint-delay: 10 ns, ALL systems (HGX-validated store-issue cost)
 ```
+
+### How the simulator composes dimensions (why the legs are in dim1)
+
+AstraSim's dimensions are **alternatives, not layers**:
+`MultiDimTopology::send()` selects the single dimension a hop travels in
+and prices it with that dimension's latency/BW alone — dim0 is never added
+underneath a dim1 hop. Consequently each dimension's latency must describe
+the COMPLETE physical path of one hop of its type:
+
+- a dim0 hop = the full in-rack trip, XPU→ToR→XPU (550 Loom / 500 baseline);
+- a dim1 hop = the full cross-rack trip, XPU→ToR→wire→ToR→XPU
+  (1650 Loom, legs included per D11 / 3000 baseline, legs inside its
+  end-to-end anchor).
+
+Without D11, the sim's dim1 hop would leave XPU memory and arrive at the
+source ToR for free. Hierarchical collectives that phase dim0-then-dim1 pay
+full dim0 + full dim1 — also physically correct, because dimension-phased
+algorithms genuinely store-and-forward through an intermediate XPU's memory.
+The baseline's dim0/dim1 really are disjoint physical paths (fabric vs NIC),
+which is why the orthogonal-dims assumption fits it exactly; Loom's dims
+share the edge link and ToR — correct in latency accounting (D11), not
+capturable in contention (the D8 gap, congestion tier).
 
 ## 2. The core asymmetry (why Loom's dim1 ≠ baseline's dim1)
 
