@@ -22,7 +22,7 @@
         <mxCell id="t1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;spacing=0;fontSize=9;strokeWidth=1;spacingTop=-3;fontStyle=1" value="Loom ToR Switch" vertex="1">
           <mxGeometry x="212" y="510" width="166" height="38" as="geometry" />
         </mxCell>
-        <mxCell id="t1a" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontSize=8;fontFamily=Courier" value="+ t_pipe per traversal" vertex="1">
+        <mxCell id="t1a" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontSize=8;fontFamily=Courier" value="local: +t_pipe_local · remote: +t_pipe" vertex="1">
           <mxGeometry x="220" y="526" width="150" height="14" as="geometry" />
         </mxCell>
         <mxCell id="d0" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=8;align=center;fontStyle=2" value="dim0: Switch (rack fabric)" vertex="1">
@@ -51,7 +51,7 @@
         <mxCell id="t2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;spacing=0;fontSize=9;strokeWidth=1;spacingTop=-3;fontStyle=1" value="Loom ToR Switch" vertex="1">
           <mxGeometry x="452" y="510" width="166" height="38" as="geometry" />
         </mxCell>
-        <mxCell id="t2a" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontSize=8;fontFamily=Courier" value="+ t_pipe per traversal" vertex="1">
+        <mxCell id="t2a" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontSize=8;fontFamily=Courier" value="local: +t_pipe_local · remote: +t_pipe" vertex="1">
           <mxGeometry x="460" y="526" width="150" height="14" as="geometry" />
         </mxCell>
         <mxCell id="e3" edge="1" parent="1" source="x3" target="t2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endSize=4;startSize=4;startArrow=classic;startFill=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0">
@@ -70,7 +70,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="d1" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=8;align=center;fontStyle=2" value="dim1: Switch (inter-ToR Ethernet) — bandwidth × goodput" vertex="1">
+        <mxCell id="d1" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=8;align=center;fontStyle=2" value="dim1: Switch (inter-ToR Ethernet) — ×goodput · +RoCE stack · baselines: +rdma-init" vertex="1">
           <mxGeometry x="290" y="604" width="250" height="12" as="geometry" />
         </mxCell>
         <mxCell id="cfg" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontSize=8;fontFamily=Courier;fillColor=#f5f5f5;strokeColor=#666666" value="npus_count: [ M, N ] · topology: [ Switch, Switch ]" vertex="1">

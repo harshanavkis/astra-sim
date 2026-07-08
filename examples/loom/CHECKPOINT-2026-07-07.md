@@ -105,7 +105,12 @@ GPT-3 175B); `799ed6c` matrix + apps; `7705a9c` README.
 
 Key modeling decisions:
 - Loom switch = constants folded into per-dim latency/BW (HGX-validated
-  technique): `t_pipe` adder (dim0 +1×, dim1 +2×), goodput factor on dim1.
+  technique): dim0 + `t_pipe_local` (~50 ns lookup adder; the ToR IS the
+  rack switch), dim1 + 2×`t_pipe` + 700 ns RoCE stack, goodput on dim1.
+  All network constants anchored to published/validated numbers (README
+  table); only t_pipe/t_pipe_local + coalescing curve are testbed-owned.
+  Endpoint costs route-split: store-issue 10 ns (HGX-validated) for ALL
+  systems; baseline RDMA initiation on dim1 only (B1 2400, B2 2800 ns).
 - Endpoint models via existing knobs: `endpoint-delay` (Loom 1ns, B1 700ns*,
   B2 3µs* + `--rendezvous-protocol`), eager = posted write. *placeholders.
 - SM reservation: roofline `peak-perf` 989 vs 839 TFLOPS (20/132 SMs).

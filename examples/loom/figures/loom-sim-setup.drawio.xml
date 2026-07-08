@@ -25,7 +25,7 @@
         <mxCell id="sys" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EFEFEF;strokeColor=#666666;verticalAlign=top;spacing=0;fontSize=9;strokeWidth=1;spacingTop=-3;fontStyle=1" value="ASTRA-sim System Layer (unmodified)" vertex="1">
           <mxGeometry x="200" y="442" width="300" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="sys1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#99CCFF;strokeColor=#6c8ebf;fontSize=8" value="endpoint-delay = per-message endpoint cost" vertex="1">
+        <mxCell id="sys1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#99CCFF;strokeColor=#6c8ebf;fontSize=8" value="endpoint-delay = 10 ns store issue (all systems, HGX-validated)" vertex="1">
           <mxGeometry x="208" y="456" width="284" height="14" as="geometry" />
         </mxCell>
         <mxCell id="sys2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#99CCFF;strokeColor=#6c8ebf;fontSize=8" value="eager = posted write · rendezvous = RDMA handshake" vertex="1">
@@ -41,27 +41,27 @@
 
         <!-- Network layer -->
         <mxCell id="net" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EFEFEF;strokeColor=#666666;verticalAlign=top;spacing=0;fontSize=9;strokeWidth=1;spacingTop=-3;fontStyle=1" value="Analytical Network (2 dimensions)" vertex="1">
-          <mxGeometry x="200" y="542" width="300" height="88" as="geometry" />
+          <mxGeometry x="200" y="542" width="300" height="98" as="geometry" />
         </mxCell>
         <mxCell id="net1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=8;fontStyle=1" value="dim0: rack fabric through Loom ToR" vertex="1">
           <mxGeometry x="208" y="556" width="284" height="14" as="geometry" />
         </mxCell>
-        <mxCell id="net2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontSize=8;fontFamily=Courier" value="latency += t_pipe" vertex="1">
+        <mxCell id="net2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontSize=8;fontFamily=Courier" value="latency += t_pipe_local (lookup adder, ~50 ns)" vertex="1">
           <mxGeometry x="208" y="572" width="284" height="13" as="geometry" />
         </mxCell>
         <mxCell id="net3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=8;fontStyle=1" value="dim1: inter-ToR Ethernet" vertex="1">
           <mxGeometry x="208" y="592" width="284" height="14" as="geometry" />
         </mxCell>
-        <mxCell id="net4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontSize=8;fontFamily=Courier" value="latency += 2·t_pipe · bandwidth × goodput" vertex="1">
-          <mxGeometry x="208" y="608" width="284" height="13" as="geometry" />
+        <mxCell id="net4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontSize=8;fontFamily=Courier" value="+2·t_pipe + RoCE stack · BW × goodput&#xa;baselines: +rdma-init here only" vertex="1">
+          <mxGeometry x="208" y="608" width="284" height="24" as="geometry" />
         </mxCell>
 
         <!-- Testbed calibration -->
         <mxCell id="tb" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;verticalAlign=top;spacing=0;fontSize=9;strokeWidth=1;spacingTop=-3;fontStyle=1" value="Coyote / U280 testbed" vertex="1">
-          <mxGeometry x="560" y="470" width="170" height="52" as="geometry" />
+          <mxGeometry x="560" y="470" width="170" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="tb1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontSize=8;fontFamily=Courier" value="t_pipe · goodput · endpoint costs" vertex="1">
-          <mxGeometry x="568" y="486" width="154" height="26" as="geometry" />
+        <mxCell id="tb1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontSize=8;fontFamily=Courier" value="t_pipe, t_pipe_local · coalescing curve&#xa;(all other constants published/validated)" vertex="1">
+          <mxGeometry x="568" y="486" width="154" height="34" as="geometry" />
         </mxCell>
         <mxCell id="e3" edge="1" parent="1" source="tb" target="sys" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endSize=4;startSize=4;dashed=1;strokeColor=#d79b00;fontSize=8;exitX=0;exitY=0.35;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0" value="calibrate">
           <mxGeometry relative="1" as="geometry" />

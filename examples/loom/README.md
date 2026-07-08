@@ -103,7 +103,8 @@ Phases 0–5); each is swept in the sensitivity plan regardless.
 
 | Constant | Placeholder | Source (eventually) |
 |---|---|---|
-| `t_loom_pipe` | 500 ns | testbed T3 (pipeline microbench); swept 100 ns–5 µs |
+| `t_pipe` (remote route, per ToR) | 500 ns | encap/translate pipeline; testbed T3; swept 100 ns–5 µs |
+| `t_pipe_local` (in-rack adder) | 50 ns | binding lookup + bounds over stock switch forwarding — the ToR IS the rack switch, whose forwarding is already in fabric latency; testbed T3 (vs raw Coyote forwarding) |
 | endpoint-delay (ALL systems) | 10 ns | VALIDATED: ASTRA-sim's HGX-H100-validated.json endpoint-delay, calibrated vs real HGX; route-invariant store-issue cost (ideal B3 keeps 1 ns; event queue rejects 0) |
 | inter-ToR wire+switch | 600 ns | cut-through ToR datasheets (300-800ns, Tomahawk/Trident class) + propagation |
 | B1 rdma-init (dim1 only) | 2400 ns | GPU-initiated small put ~3us end-to-end: NVIDIA IBGDA blog / NVSHMEM perf docs; swept |

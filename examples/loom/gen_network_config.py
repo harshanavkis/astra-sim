@@ -29,7 +29,9 @@ MODES = ("loom", "baseline", "ideal")
 
 def build_yaml(args) -> str:
     if args.mode == "loom":
-        lat0 = args.fabric_latency + args.pipe_ns
+        # in-rack: the Loom ToR IS the rack switch (whose forwarding is
+        # already inside fabric_latency); Loom adds only the table lookups
+        lat0 = args.fabric_latency + args.pipe_local_ns
         # source + destination ToR pipelines + the RoCE stack the Loom
         # switch itself uses (baselines' published numbers include their NIC)
         lat1 = args.net_latency + args.roce_stack_ns + 2 * args.pipe_ns
@@ -76,7 +78,12 @@ def main():
                         "class, 300-800ns datasheets + propagation)")
     # Loom / baseline constants (placeholders; see README table)
     p.add_argument("--pipe-ns", type=float, default=500.0,
-                   help="Loom switch pipeline latency t_loom_pipe (placeholder 500)")
+                   help="Loom REMOTE-route pipeline per ToR traversal "
+                        "(encap/translate; placeholder 500, swept; testbed T3)")
+    p.add_argument("--pipe-local-ns", type=float, default=50.0,
+                   help="Loom LOCAL-route adder over stock switch forwarding "
+                        "(binding lookup + bounds; pipelined table lookups, "
+                        "placeholder 50; testbed T3 measures vs raw Coyote)")
     p.add_argument("--loom-goodput", type=float, default=0.947,
                    help="Loom encap goodput factor at the run's message mix")
     p.add_argument("--roce-goodput", type=float, default=0.95,
