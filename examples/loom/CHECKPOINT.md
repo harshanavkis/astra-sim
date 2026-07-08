@@ -1,6 +1,6 @@
 # CHECKPOINT — Loom project state
 
-> **Last updated: 2026-07-08 (data-path/control-path RDMA asymmetry D5; ANALYTICAL-MODEL.md added).** LIVING DOCUMENT — overwritten in place with
+> **Last updated: 2026-07-08 (D10 asymmetric remote traversals).** LIVING DOCUMENT — overwritten in place with
 > every change (user mandate), alongside `CODE-MAP.md`. Written for session
 > restart on a possibly different server: read this first; it contains
 > everything needed to resume. Lives in the astra-sim repo (branch
@@ -108,7 +108,7 @@ GPT-3 175B); `799ed6c` matrix + apps; `7705a9c` README.
 Key modeling decisions:
 - Loom switch = constants folded into per-dim latency/BW (HGX-validated
   technique): dim0 + `t_pipe_local` (~50 ns lookup adder; the ToR IS the
-  rack switch), dim1 + 2×(`t_pipe` + 150 ns roce_stream) per traversal — Loom creates no work requests on the data path (connections pre-established in the control path; no WQE/doorbell/QP-fetch/payload-DMA — those are the baseline's per-op rdma-init); only the streaming packet-engine share survives. Full constants + decisions ledger: `ANALYTICAL-MODEL.md`.
+  rack switch), dim1 = wire + (t_pipe + roce_stream) at source + (roce_stream + t_pipe_local) at destination = 1450 ns — no data-path work requests (D5), destination = local-delivery pipeline not a second t_pipe (D10). Full constants + decisions ledger: `ANALYTICAL-MODEL.md`.
   All network constants anchored to published/validated numbers (README
   table); only t_pipe/t_pipe_local + coalescing curve are testbed-owned.
   Endpoint costs route-split: store-issue 10 ns (HGX-validated) for ALL

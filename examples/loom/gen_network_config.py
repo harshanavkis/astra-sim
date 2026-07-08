@@ -32,11 +32,14 @@ def build_yaml(args) -> str:
         # in-rack: the Loom ToR IS the rack switch (whose forwarding is
         # already inside fabric_latency); Loom adds only the table lookups
         lat0 = args.fabric_latency + args.pipe_local_ns
-        # two ToR traversals; each traversal's pipeline = Loom logic
-        # (validate/match/encap or decap/bounds/translate) + the transport
-        # (RoCE) processing inside the same switch -- one composite cost,
-        # which is exactly what testbed T3 measures per traversal
-        lat1 = args.net_latency + 2 * (args.pipe_ns + args.roce_stack_ns)
+        # source ToR: full remote pipeline (lookup/validate + encap) + RoCE
+        # TX streaming. Destination ToR: RoCE RX streaming + decap + the SAME
+        # check/translate/forward the local route does (both routes converge
+        # on the transaction generator, design 6.1) -> t_pipe_local, not a
+        # second t_pipe. T3 measures the end-to-end sum.
+        lat1 = (args.net_latency
+                + (args.pipe_ns + args.roce_stack_ns)
+                + (args.roce_stack_ns + args.pipe_local_ns))
         # equal-wires provisioning: ToR uplink aggregate = M NICs' aggregate,
         # divided by the explicit oversubscription factor
         bw1 = args.net_bw * args.loom_goodput / args.uplink_oversub

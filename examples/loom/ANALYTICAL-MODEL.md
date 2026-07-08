@@ -1,6 +1,6 @@
 # The analytical model, number by number (inspection document)
 
-> **Last updated: 2026-07-08.** Living document (CLAUDE.md rule 1). Every
+> **Last updated: 2026-07-08 (D10: asymmetric remote traversals).** Living document (CLAUDE.md rule 1). Every
 > constant and modeling decision in the simulation, with its value,
 > decomposition, what it includes/excludes per system, provenance, and the
 > reasoning — so each can be inspected and vetoed individually.
@@ -13,8 +13,9 @@ message, route-invariant) + per-hop dimension latency (network YAML) +
 
 ```
               dim0 (in-rack)                    dim1 (cross-rack)
-Loom     :  fabric + t_pipe_local          wire + 2·(t_pipe + roce_stream)
-           = 500 + 50        = 550 ns     = 600 + 2·(500 + 150) = 1900 ns
+Loom     :  fabric + t_pipe_local          wire + (t_pipe + roce_stream)      [source ToR]
+           = 500 + 50        = 550 ns          + (roce_stream + t_pipe_local) [destination ToR]
+                                          = 600 + 650 + 200 = 1450 ns
 B1 (GPU) :  fabric           = 500 ns     wire + rdma_init_B1 = 600 + 2400 = 3000 ns
 B2 (proxy): fabric           = 500 ns     wire + rdma_init_B2 = 600 + 2800 = 3400 ns  (+ rendezvous)
 B3 (ideal): fabric           = 500 ns     wire                = 600 ns
@@ -51,9 +52,15 @@ by the routing pipeline's capability. What remains per traversal:
 | Binding lookup, bounds, translate, encap/decap | Yes | `t_pipe` = 500 ns* per traversal |
 | Packet build / ICRC / CC state (streaming share) | Yes | `roce_stream` = 150 ns per traversal |
 
-So `dim1(Loom) = 600 + 2·(500 + 150) = 1900 ns` vs `dim1(B1) = 3000 ns`:
-the gap **is** the moved-to-setup work-request machinery, which is the
-paper's claim rendered as arithmetic. If the claim is wrong, the testbed
+The two ToR traversals are **asymmetric** (D10): the source runs the full
+remote pipeline (lookup/validate + encap = `t_pipe`); the destination runs
+RoCE RX + decap + the *same* check/translate/forward that local delivery
+uses — both routes converge on the transaction generator (design §6.1) —
+so it costs `t_pipe_local`, not a second `t_pipe`. Only the RoCE streaming
+share is paid at both ends (the baseline pays its receive-side NIC too,
+inside its end-to-end anchor). So `dim1(Loom) = 1450 ns` vs
+`dim1(B1) = 3000 ns`: the gap **is** the moved-to-setup work-request
+machinery, which is the paper's claim rendered as arithmetic. If the claim is wrong, the testbed
 will say so: T3 measures the composite per-traversal cost through Coyote's
 actual RoCE stack, and the substrate RoCE ping-pong floor isolates the
 transport share. **Accounting rule: never add `roce_stream` on top of a
@@ -106,6 +113,11 @@ transport share. **Accounting rule: never add `roce_stream` on top of a
   favors Loom; congestion-tier item).
 - **D9 — no hand-authored applications**: shipped ETs, STG published
   shapes, or captured traces only.
+- **D10 — asymmetric remote traversals** *(user-identified)*: destination-
+  side remote work = the local-route delivery pipeline (`t_pipe_local`),
+  not a second full `t_pipe`; RoCE streaming share at both ends. Charging
+  a full pipeline at the destination was inconsistent with pricing the
+  identical table work at 50 ns on the local route.
 
 ## 5. Open items for inspection
 
