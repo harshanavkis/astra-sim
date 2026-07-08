@@ -1,6 +1,6 @@
 # The analytical model, number by number (inspection document)
 
-> **Last updated: 2026-07-08 (dims-are-alternatives clarification; D11/D12).** Living document (CLAUDE.md rule 1). Every
+> **Last updated: 2026-07-08 (dims-are-alternatives + lumping note; D11/D12).** Living document (CLAUDE.md rule 1). Every
 > constant and modeling decision in the simulation, with its value,
 > decomposition, what it includes/excludes per system, provenance, and the
 > reasoning — so each can be inspected and vetoed individually.
@@ -67,6 +67,18 @@ The baseline's dim0/dim1 really are disjoint physical paths (fabric vs NIC),
 which is why the orthogonal-dims assumption fits it exactly; Loom's dims
 share the edge link and ToR — correct in latency accounting (D11), not
 capturable in contention (the D8 gap, congestion tier).
+
+**Lumping note:** the analytical hop is one scalar — `latency + size/BW`
+charged at the hop; the simulator has no notion of where along the path
+time is spent. The remote ToR's share (decap/translate, 200 of the 1650)
+is "paid at the source" only in the sense that all terms are summed into
+one number; for delivery time this is provably equivalent (addition
+commutes), and both systems are lumped identically (the baseline's receive
+NIC sits inside its 3000 the same way), so no comparison bias enters.
+Location starts to matter only where queues can form — the congestion tier
+and ns-3, where delays genuinely sit at devices. Bandwidth is lumped the
+same way (one 47.35 GB/s pipe, min-segment governs; benign since the
+network segment is the bottleneck and cut-through overlaps segments).
 
 ## 2. The core asymmetry (why Loom's dim1 ≠ baseline's dim1)
 

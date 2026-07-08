@@ -1,6 +1,6 @@
 # CHECKPOINT — Loom project state
 
-> **Last updated: 2026-07-08 (D11/D12 + dims-are-alternatives note in ANALYTICAL-MODEL).** LIVING DOCUMENT — overwritten in place with
+> **Last updated: 2026-07-08 (D11/D12, dims-are-alternatives + lumping notes).** LIVING DOCUMENT — overwritten in place with
 > every change (user mandate), alongside `CODE-MAP.md`. Written for session
 > restart on a possibly different server: read this first; it contains
 > everything needed to resume. Lives in the astra-sim repo (branch
