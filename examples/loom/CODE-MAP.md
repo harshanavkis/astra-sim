@@ -3,7 +3,7 @@
 > **Keep this updated with every commit that adds/changes code.** For each
 > artifact: what was written, and how it corresponds to the real Loom system
 > (the paper's design; eventually the Coyote/U280 prototype and an ASIC ToR).
-> Last updated: 2026-07-08 (D13 + ⚑ FPGA annotations; README constants section rewritten).
+> Last updated: 2026-07-08 (named sources for published constants; credits sweep gains infinite point).
 
 ## 1. Simulator extensions (C++)
 
@@ -119,7 +119,7 @@ speed (not trace durations) is the faithful model.
 |---|---|---|
 | `fetch_stg.sh`, `gen_stg_workloads.sh` | pins STG (astra-sim's generator) and wraps `moe`/`dense` presets with **published dims** (Mixtral 8x7B, GPT-3 175B); rank count = dp·tp·pp·ep | application workloads (W-A/W-B in the eval plan); dims never invented |
 | `workload/gen_p2p_patterns.py` | single/incast/victim flow stimulus (per-role sizes, unique tags, matching recvs; idle ranks get a 1 µs COMP — the feeder rejects empty traces) | iperf-category mechanism stimulus; the victim pattern is testbed T5's twin |
-| `workload/gen_read_pattern.py` | N independent MEM_LOADs per rank | read-credit experiments (testbed T6 twin) |
+| `workload/gen_read_pattern.py` | N independent MEM_LOADs per rank | read-credit experiments (testbed T6 twin). Credits apply ONLY to MEM_LOAD/STORE workloads (by design: credits bound non-posted reads; writes are posted). `read-credits` >= outstanding loads = effectively infinite; the sweep's 1048576 point is the uncapped design |
 
 ## 5. Experiment harness
 

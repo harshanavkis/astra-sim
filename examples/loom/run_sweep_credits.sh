@@ -7,7 +7,9 @@ BIN=build/astra_analytical/build/bin/AstraSim_Analytical_Congestion_Unaware
 python3 examples/loom/workload/gen_read_pattern.py --npus 4 --loads 64 --size-kb 4 --out /tmp/reads >/dev/null
 python3 examples/loom/gen_network_config.py --mode loom --racks 2 --xpus-per-rack 2 -o /tmp/net.yml
 echo "read_credits,wall_cycles"
-for CR in 1 2 4 8 16 32 64; do
+# 1048576 = effectively infinite (>= any outstanding-load count): the design
+# without a credit bound. Any value >= --loads behaves as infinity.
+for CR in 1 2 4 8 16 32 64 1048576; do
   sed "s/\"read-credits\": 32/\"read-credits\": $CR/" examples/loom/remote_memory/loom_peer_reads.json > /tmp/rm.json
   W=$($BIN --workload-configuration=/tmp/reads/reads \
     --system-configuration=examples/loom/system/loom.json \

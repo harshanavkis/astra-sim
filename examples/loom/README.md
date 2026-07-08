@@ -123,16 +123,22 @@ lookup — the connection identifies the binding).
 
 ### Published / validated (no FPGA needed)
 
-| Constant | Value | Source |
+| Constant | Value | Named source |
 |---|---|---|
-| endpoint-delay (ALL systems) | 10 ns | ASTRA-sim HGX-H100-validated.json (validated vs real HGX); ideal B3 keeps 1 ns (event queue rejects 0) |
-| inter-ToR wire+switch | 600 ns | cut-through ToR datasheets (300–800 ns class) + propagation |
-| B1 rdma-init (dim1 only) | 2400 ns | ≈3 µs end-to-end GPU-initiated put (NVIDIA IBGDA blog / NVSHMEM docs); swept |
-| RoCE goodput | 0.95 | header math (Eth+IP+UDP+BTH ≈78 B on 4 KB MTU) |
-| Loom goodput | 0.947 | RoCE goodput × 4096/4108 (12 B ⟨offset·op·len⟩ header) |
-| scale-up hop (alt. preset) | 936.25 ns | ASTRA-sim HGX-H100-validated.yml |
-| B1 SM reservation | 20 of 132 SMs | DeepSeek-V3; swept {8, 20, 32} |
-| `--uplink-oversub` | 1.0 (equal wires) | fairness choice; swept |
+| endpoint-delay (ALL systems) | 10 ns | in-repo `examples/system/native_collectives/HGX-H100-validated.json`, validated against real HGX-H100 runs in ASTRA-sim 2.0 (Won et al., ISPASS 2023); ideal B3 keeps 1 ns (event queue rejects 0) |
+| scale-up hop (alt. preset) | 936.25 ns / 400 GB/s | in-repo `HGX-H100-validated.yml`, same validation (Won et al., ISPASS 2023) |
+| fabric hop (default dim0) | 500 ns / 64 GB/s | PCIe5 x16 switch-class estimate; cross-check: Li, Ammar et al., "Evaluating Modern GPU Interconnect", IEEE TPDS 2020 (PCIe/NVLink microbenchmarks) — [verify exact figure] |
+| inter-ToR wire+switch | 600 ns | Broadcom Tomahawk/Trident-class cut-through latency (300–800 ns, vendor datasheets/briefs) + propagation — [verify exact figure] |
+| B1 rdma-init (dim1 only) | 2400 ns | from ≈3 µs end-to-end GPU-initiated put: NVIDIA Developer Blog on IBGDA/GPUDirect Async (2022) + NVSHMEM performance docs; swept |
+| B2 rdma-init components | 2800 ns | ib_write_lat ≈1.6–2 µs: NVIDIA/Mellanox `perftest` suite (ConnectX-6/7 class); WQE/doorbell costs: Kalia, Kaminsky, Andersen, "Design Guidelines for High Performance RDMA Systems", USENIX ATC 2016; proxy handoff: NCCL net-proxy path |
+| RoCE goodput | 0.95 | computed: Eth+IP+UDP+BTH ≈78 B headers on 4 KB MTU (RoCEv2 framing, InfiniBand spec Annex A17) |
+| Loom goodput | 0.947 | computed: RoCE goodput × 4096/4108 (12 B ⟨offset·op·len⟩ header, paper design §6.2) |
+| B1 SM reservation | 20 of 132 SMs | DeepSeek-AI, "DeepSeek-V3 Technical Report", arXiv:2412.19437; swept {8, 20, 32} |
+| workload shapes | Mixtral 8x7B / GPT-3 175B | Jiang et al., arXiv:2401.04088 / Brown et al., "Language Models are Few-Shot Learners", NeurIPS 2020 |
+| `--uplink-oversub` | 1.0 (equal wires) | fairness choice (ours); swept |
+
+Entries marked **[verify exact figure]** have a solid source *class* but the
+specific value should be pinned to a page/table before the paper cites it.
 
 ## Running everything
 
