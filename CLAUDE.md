@@ -31,7 +31,13 @@ Start here when resuming: `examples/loom/CHECKPOINT.md` (project state),
 6. Commit at regular intervals on `loom-sim`; **no Co-Authored-By lines**.
 7. Run experiments inside the Docker image `astra-sim:loom` (official
    Dockerfile); one-command suite: `examples/loom/run_all_docker.sh`.
-8. The paper repo (`~/loom-paper`) is separate: never commit there unless
-   told; all code-related work lives on this repo's `loom-sim` branch.
-   Paper prose rules live there (no em dashes, XPU terminology, tex is
-   design ground truth: no GFA/token/tag/seq; wire = offset·op·len).
+8. The paper repo (`~/loom-paper`) is OFF LIMITS: never edit or commit
+   anything there unless explicitly told; all work lives on this repo's
+   `loom-sim` branch. (Paper prose rules, for when asked: no em dashes,
+   XPU terminology, tex is design ground truth: no GFA/token/tag/seq;
+   wire = offset·op·len.)
+9. Paper-repo references in CODE-MAP/CHECKPOINT stay on `loom-sim` (they
+   bind code to the design and enable session restart); when the repo must
+   stand alone for submission, create a separate sanitized `artifact`
+   branch (strip CLAUDE.md/CHECKPOINT/CODE-MAP internals, squash history)
+   rather than scrubbing the working branch.
