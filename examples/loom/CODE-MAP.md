@@ -3,7 +3,7 @@
 > **Keep this updated with every commit that adds/changes code.** For each
 > artifact: what was written, and how it corresponds to the real Loom system
 > (the paper's design; eventually the Coyote/U280 prototype and an ASIC ToR).
-> Last updated: 2026-07-08 (D10 asymmetric remote traversals; see ANALYTICAL-MODEL.md).
+> Last updated: 2026-07-08 (D10 + latency-breakdown figure).
 
 ## 1. Simulator extensions (C++)
 

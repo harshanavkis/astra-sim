@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net">
+  <diagram name="Page-1" id="loom-latency-breakdown">
+    <mxGraphModel dx="800" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;align=left;fontStyle=1" value="Latency breakdown per route (segment widths NOT to scale; + endpoint-delay 10 ns at issue, all systems)" vertex="1">
+          <mxGeometry x="120" y="380" width="620" height="14" as="geometry" />
+        </mxCell>
+
+        <!-- Lane 1: Loom local -->
+        <mxCell id="l1" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=9;align=left;fontStyle=1" value="Loom, in-rack" vertex="1">
+          <mxGeometry x="120" y="418" width="130" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="l1a" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=#666666;fontSize=8" value="rack fabric + stock switching&#xa;500 ns" vertex="1">
+          <mxGeometry x="260" y="414" width="150" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="l1b" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=8" value="t_pipe_local (lookup+bounds)&#xa;50 ns" vertex="1">
+          <mxGeometry x="410" y="414" width="150" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="l1t" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=9;align=left;fontFamily=Courier" value="= 550 ns" vertex="1">
+          <mxGeometry x="720" y="424" width="80" height="14" as="geometry" />
+        </mxCell>
+
+        <!-- Lane 2: Loom remote -->
+        <mxCell id="l2" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=9;align=left;fontStyle=1" value="Loom, cross-rack&#xa;(dim1)" vertex="1">
+          <mxGeometry x="120" y="478" width="130" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="l2a" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=8" value="SOURCE ToR: t_pipe&#xa;(validate·match·encap) 500 ns" vertex="1">
+          <mxGeometry x="260" y="474" width="130" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="l2b" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#99CCFF;strokeColor=#6c8ebf;fontSize=8" value="roce_stream TX&#xa;150 ns" vertex="1">
+          <mxGeometry x="390" y="474" width="80" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="l2c" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=#666666;fontSize=8" value="wire + Eth switch&#xa;600 ns" vertex="1">
+          <mxGeometry x="470" y="474" width="80" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="l2d" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#99CCFF;strokeColor=#6c8ebf;fontSize=8" value="roce_stream RX&#xa;150 ns" vertex="1">
+          <mxGeometry x="550" y="474" width="80" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="l2e" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=8" value="DEST ToR: t_pipe_local&#xa;(decap·translate) 50 ns" vertex="1">
+          <mxGeometry x="630" y="474" width="80" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="l2t" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=9;align=left;fontFamily=Courier" value="= 1450 ns" vertex="1">
+          <mxGeometry x="720" y="484" width="80" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="l2n" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=8;align=left;fontStyle=2" value="t_pipe paid ONCE (source only); destination = the local delivery pipeline (routes converge on the transaction generator)" vertex="1">
+          <mxGeometry x="260" y="510" width="470" height="12" as="geometry" />
+        </mxCell>
+
+        <!-- Lane 3: B1 remote -->
+        <mxCell id="l3" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=9;align=left;fontStyle=1" value="B1 GPU-RDMA,&#xa;cross-rack" vertex="1">
+          <mxGeometry x="120" y="548" width="130" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="l3a" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=8" value="GPU: create WQE + doorbell&#xa;(every transfer)" vertex="1">
+          <mxGeometry x="260" y="544" width="130" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="l3b" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=8" value="NIC: WQE fetch · QP ctx · payload DMA · packet build" vertex="1">
+          <mxGeometry x="390" y="544" width="160" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="l3c" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=#666666;fontSize=8" value="wire + Eth switch&#xa;600 ns" vertex="1">
+          <mxGeometry x="550" y="544" width="80" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="l3d" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=8" value="recv NIC + DMA in&#xa;(inside anchor)" vertex="1">
+          <mxGeometry x="630" y="544" width="80" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="l3t" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=9;align=left;fontFamily=Courier" value="= 3000 ns" vertex="1">
+          <mxGeometry x="720" y="554" width="80" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="l3n" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=8;align=left;fontStyle=2" value="rdma_init 2400 ns = published ~3 us end-to-end put (IBGDA/NVSHMEM) minus the wire; Loom did this machinery ONCE, at binding time (control path)" vertex="1">
+          <mxGeometry x="260" y="580" width="500" height="12" as="geometry" />
+        </mxCell>
+
+        <!-- Lane 4: B1 local -->
+        <mxCell id="l4" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=9;align=left;fontStyle=1" value="B1, in-rack" vertex="1">
+          <mxGeometry x="120" y="618" width="130" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="l4a" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=#666666;fontSize=8" value="rack fabric + stock switching&#xa;500 ns (a plain store, same as Loom)" vertex="1">
+          <mxGeometry x="260" y="614" width="150" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="l4t" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=9;align=left;fontFamily=Courier" value="= 500 ns" vertex="1">
+          <mxGeometry x="720" y="624" width="80" height="14" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -7,6 +7,8 @@
 
 ## 1. The latency equations
 
+(Visualized in `figures/loom-latency-breakdown.drawio.xml`.)
+
 A message's end-to-end latency = `endpoint-delay` (system JSON, per
 message, route-invariant) + per-hop dimension latency (network YAML) +
 `size / dimension-bandwidth` serialization. Per mode:
