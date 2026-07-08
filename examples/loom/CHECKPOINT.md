@@ -1,6 +1,6 @@
 # CHECKPOINT — Loom project state
 
-> **Last updated: 2026-07-08 (D11/D12, dims-are-alternatives + lumping notes).** LIVING DOCUMENT — overwritten in place with
+> **Last updated: 2026-07-08 (D13 per-stage pipeline parameters).** LIVING DOCUMENT — overwritten in place with
 > every change (user mandate), alongside `CODE-MAP.md`. Written for session
 > restart on a possibly different server: read this first; it contains
 > everything needed to resume. Lives in the astra-sim repo (branch
@@ -108,7 +108,7 @@ GPT-3 175B); `799ed6c` matrix + apps; `7705a9c` README.
 Key modeling decisions:
 - Loom switch = constants folded into per-dim latency/BW (HGX-validated
   technique): dim0 + `t_pipe_local` (~50 ns lookup adder; the ToR IS the
-  rack switch), dim1 = edge legs (500) + (t_pipe 200 + roce_stream) at source + wire + (roce_stream + t_pipe_local) at destination = 1650 ns (D11 legs, D12 t_pipe ASIC-class) — no data-path work requests (D5), destination = local-delivery pipeline not a second t_pipe (D10). Full constants + decisions ledger: `ANALYTICAL-MODEL.md`.
+  rack switch), dim1 = edge legs (500) + source stages lookup/queue/encap (200) + roce (150) + wire (600) + roce (150) + dest translate/forward (25) = 1625 ns; per-stage params 1:1 with hw-controller blocks (D13), coarse --pipe-ns override for sweeps — no data-path work requests (D5), destination = local-delivery pipeline not a second t_pipe (D10). Full constants + decisions ledger: `ANALYTICAL-MODEL.md`.
   All network constants anchored to published/validated numbers (README
   table); only t_pipe/t_pipe_local + coalescing curve are testbed-owned.
   Endpoint costs route-split: store-issue 10 ns (HGX-validated) for ALL

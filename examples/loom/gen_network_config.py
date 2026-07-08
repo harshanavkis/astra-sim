@@ -29,9 +29,17 @@ MODES = ("loom", "baseline", "ideal")
 
 def build_yaml(args) -> str:
     if args.mode == "loom":
+        # stage sums (hw-controller blocks); coarse knobs override if set
+        pipe_local = (args.pipe_local_ns if args.pipe_local_ns is not None
+                      else args.t_lookup + args.t_translate + args.t_forward)
+        pipe_src = (args.pipe_ns if args.pipe_ns is not None
+                    else args.t_lookup + args.t_queue + args.t_encap)
+        # destination does NO range lookup (the connection identifies the
+        # binding): bounds/translate + local forward only
+        dest_logic = args.t_translate + args.t_forward
         # in-rack: the Loom ToR IS the rack switch (whose forwarding is
         # already inside fabric_latency); Loom adds only the table lookups
-        lat0 = args.fabric_latency + args.pipe_local_ns
+        lat0 = args.fabric_latency + pipe_local
         # source ToR: full remote pipeline (lookup/validate + encap) + RoCE
         # TX streaming. Destination ToR: RoCE RX streaming + decap + the SAME
         # check/translate/forward the local route does (both routes converge
@@ -43,8 +51,8 @@ def build_yaml(args) -> str:
         # its PCIe legs, so only Loom needs them added explicitly.
         lat1 = (args.fabric_latency
                 + args.net_latency
-                + (args.pipe_ns + args.roce_stack_ns)
-                + (args.roce_stack_ns + args.pipe_local_ns))
+                + (pipe_src + args.roce_stack_ns)
+                + (args.roce_stack_ns + dest_logic))
         # equal-wires provisioning: ToR uplink aggregate = M NICs' aggregate,
         # divided by the explicit oversubscription factor
         bw1 = args.net_bw * args.loom_goodput / args.uplink_oversub
@@ -87,16 +95,30 @@ def main():
                    help="inter-ToR wire+switch one-way ns (cut-through ToR "
                         "class, 300-800ns datasheets + propagation)")
     # Loom / baseline constants (placeholders; see README table)
-    p.add_argument("--pipe-ns", type=float, default=200.0,
-                   help="Loom SOURCE-side remote pipeline: lookup/match/encap "
-                        "only (transport + destination work priced "
-                        "separately). ASIC-class pipelined lookups ~100-300ns "
-                        "-> placeholder 200, swept; testbed T3 (FPGA will "
-                        "read higher; sweep carries the FPGA/ASIC argument)")
-    p.add_argument("--pipe-local-ns", type=float, default=50.0,
-                   help="Loom LOCAL-route adder over stock switch forwarding "
-                        "(binding lookup + bounds; pipelined table lookups, "
-                        "placeholder 50; testbed T3 measures vs raw Coyote)")
+    # fine-grained stages, one per hw-controller block (each is what the
+    # FPGA measures per pipeline stage; sums give the route costs)
+    p.add_argument("--t-lookup", type=float, default=25.0,
+                   help="Source Validation + Route Selector (range match -> "
+                        "binding entry)")
+    p.add_argument("--t-queue", type=float, default=75.0,
+                   help="Per-Destination Transmit Queues + Scheduler, "
+                        "uncontended pass-through")
+    p.add_argument("--t-encap", type=float, default=100.0,
+                   help="TX Encapsulator")
+    p.add_argument("--t-translate", type=float, default=15.0,
+                   help="Transaction Generator: Bounds Checker + Address "
+                        "Translation (offset -> PA)")
+    p.add_argument("--t-forward", type=float, default=10.0,
+                   help="Local Forward Engine egress")
+    # coarse overrides (used by sweeps); default None = derive from stages
+    p.add_argument("--pipe-ns", type=float, default=None,
+                   help="OVERRIDE source-side remote pipeline "
+                        "(= t_lookup + t_queue + t_encap = 200 by default); "
+                        "swept by run_sweep_tpipe.sh; testbed T3")
+    p.add_argument("--pipe-local-ns", type=float, default=None,
+                   help="OVERRIDE local-route adder "
+                        "(= t_lookup + t_translate + t_forward = 50 by "
+                        "default); testbed T3 vs raw Coyote forwarding")
     p.add_argument("--loom-goodput", type=float, default=0.947,
                    help="Loom encap goodput factor at the run's message mix")
     p.add_argument("--roce-goodput", type=float, default=0.95,

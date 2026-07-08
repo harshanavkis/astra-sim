@@ -3,7 +3,7 @@
 > **Keep this updated with every commit that adds/changes code.** For each
 > artifact: what was written, and how it corresponds to the real Loom system
 > (the paper's design; eventually the Coyote/U280 prototype and an ASIC ToR).
-> Last updated: 2026-07-08 (D11 edge legs, D12 t_pipe=200 ASIC-class).
+> Last updated: 2026-07-08 (D13 per-stage pipeline params).
 
 ## 1. Simulator extensions (C++)
 
@@ -81,7 +81,7 @@ fields — the same technique as AstraSim's validated `HGX-H100-validated.yml`
 | Config term | Physical thing |
 |---|---|
 | dim0 latency = fabric + `t_pipe_local` (50 ns*) | in-rack peer store: the Loom ToR IS the rack switch (stock forwarding is inside fabric latency); Loom adds only binding lookup + bounds check (design §6.1 "adds only table lookups") |
-| dim1 latency = edge fabric legs both ends (500) + (`t_pipe` 200* + `roce_stream` 150) at the source + wire (600) + (`roce_stream` 150 + `t_pipe_local` 50*) at the destination = 1650 ns | cross-rack peer store: source = lookup/validate + encap + RoCE TX; destination = RoCE RX + decap + the same check/translate/forward as local delivery (routes converge on the transaction generator, §6.1) — no separate RDMA initiation exists in Loom (D5), and the destination is NOT a second full pipeline (D10). T3 measures the end-to-end sum; zero roce_stream if t_pipe measured inclusive |
+| dim1 latency = edge legs (500) + source stages `t_lookup+t_queue+t_encap` (200*) + `roce_stream` (150) + wire (600) + `roce_stream` (150) + dest stages `t_translate+t_forward` (25*) = 1625 ns; stage params map 1:1 to hw-controller blocks (D13) | cross-rack peer store: source = lookup/validate + encap + RoCE TX; destination = RoCE RX + decap + the same check/translate/forward as local delivery (routes converge on the transaction generator, §6.1) — no separate RDMA initiation exists in Loom (D5), and the destination is NOT a second full pipeline (D10). T3 measures the end-to-end sum; zero roce_stream if t_pipe measured inclusive |
 | dim1 bandwidth × 0.947 | RoCE goodput 0.95 (header math) × 4096/4108 (12 B ⟨offset·op·len⟩ Loom header) |
 | baseline dim1 latency = wire + `rdma-init` (B1 2400 ns, B2 2800 ns) | per-RDMA-op initiation, paid once per rack crossing; ≈3 µs end-to-end GPU-initiated put (IBGDA/NVSHMEM), resp. ib_write_lat + NCCL proxy handoff |
 | baseline dim0 = fabric only | an in-rack baseline peer access is a plain store too — route-split, user-identified fix |
