@@ -1,6 +1,6 @@
 # The analytical model, number by number (inspection document)
 
-> **Last updated: 2026-07-08 (D13 per-stage params; dim1 = 1625).** Living document (CLAUDE.md rule 1). Every
+> **Last updated: 2026-07-08 (D13 stage params; FPGA-owned constants marked ⚑).** Living document (CLAUDE.md rule 1). Every
 > constant and modeling decision in the simulation, with its value,
 > decomposition, what it includes/excludes per system, provenance, and the
 > reasoning — so each can be inspected and vetoed individually.
@@ -138,9 +138,13 @@ transport share. **Accounting rule: never add `roce_stream` on top of a
 |---|---|---|---|---|---|
 | `endpoint-delay` | 10 ns (all systems) | issuing one store toward the fabric | everything route-dependent | AstraSim `HGX-H100-validated.json` (validated) | — |
 | `fabric_latency` | 500 ns | rack fabric hop incl. stock switch forwarding | Loom's added lookups | PCIe5-switch class; alt preset: HGX 936.25 ns validated | testbed floor |
-| `t_pipe_local` | 50 ns* | binding lookup + bounds over stock forwarding | full remote pipeline | pipelined SRAM lookups, ASIC-class estimate | **T3** (Loom local path vs raw Coyote forwarding) |
-| `t_pipe` | 200 ns* | SOURCE-side lookup/match/encap only | transport streaming; destination work (that is t_pipe_local) | ASIC-class pipelined lookups ~100–300 ns; swept 100 ns–5 µs | **T3** (remote path; FPGA reads higher — sweep carries the FPGA/ASIC argument) |
-| `roce_stream` | 150 ns | packet build/ICRC/CC state per traversal | WQE/doorbell/QP-fetch/payload-DMA (Loom never does these on the data path) | HW packet-engine class | **Coyote RoCE floor** |
+| `t_lookup` | 25 ns* | Source Validation + Route Selector (range match → binding) | — | ASIC-class SRAM/TCAM lookups | **⚑ FPGA: T3 stage counter** |
+| `t_queue` | 75 ns* | Per-Destination Queues + Scheduler, uncontended pass | congestion (that's the congestion tier) | switch-design class | **⚑ FPGA: T3 stage counter** |
+| `t_encap` | 100 ns* | TX Encapsulator | coalescing benefit (T2 curve) | HW pipeline class | **⚑ FPGA: T3 stage counter** |
+| `t_translate` | 15 ns* | Transaction Generator: bounds + offset→PA | — | pipelined table read | **⚑ FPGA: T3 stage counter** |
+| `t_forward` | 10 ns* | Local Forward Engine egress | — | HW pipeline class | **⚑ FPGA: T3 stage counter** |
+| `roce_stream` | 150 ns* | QP Router + RoCEv2 per side (RX incl. Decapsulator): packet build/ICRC/CC | WQE/doorbell/QP-fetch/payload-DMA (Loom never does these on the data path) | HW packet-engine class | **⚑ FPGA: Coyote RoCE floor** |
+| derived: local adder 50 · source pipeline 200 · dest 25 | sums of the above | — | — | — | coarse sweep overrides `--pipe-ns`/`--pipe-local-ns` |
 | `wire` (`--net-latency`) | 600 ns | inter-ToR cut-through switch + propagation | endpoint anything | ToR datasheets (300–800 ns class) | — |
 | `rdma_init_B1` | 2400 ns | full per-op initiation (table above) minus wire | — | ≈3 µs end-to-end GPU-initiated put (IBGDA blog, NVSHMEM docs) | swept {S-4} |
 | `rdma_init_B2` | 2800 ns | ib_write_lat + GPU→proxy handoff, minus wire | — | perftest + Kalia ATC'16 + NCCL proxy path | testbed CPU-verbs run |
@@ -149,7 +153,10 @@ transport share. **Accounting rule: never add `roce_stream` on top of a
 | `read-credits` 32 | outstanding peer reads per NPU | — | per-binding granularity (approximation) | design §6.3 | **T6** + swept |
 | `--uplink-oversub` 1.0 | ToR uplink aggregate = M NICs (equal wires) | equal-cost framing (Loom deletes M NICs — favors Loom, prose only) | — | fairness choice | swept S-6 |
 
-\* = the only Loom-specific unknowns; everything else published/validated.
+\* = ⚑ FPGA-owned: MUST be measured on the Coyote/U280 testbed (per-stage
+cycle counters / RoCE floor), then frequency-scaled for the ASIC argument.
+Everything unstarred is published/validated. The full FPGA checklist is in
+README → "Constants: who owns each number".
 
 ## 4. Decisions ledger (each individually vetoable)
 

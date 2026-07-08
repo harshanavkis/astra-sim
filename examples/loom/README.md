@@ -13,7 +13,7 @@ knobs** — the same technique the in-repo `HGX-H100-validated.yml` uses (its
 
 | Loom / baseline feature | ASTRA-sim mechanism (existing) |
 |---|---|
-| Switch pipeline latency (`t_loom_pipe`: source validation + range match + bounds + translation) | folded into per-dimension `latency` (network YAML) |
+| Switch pipeline latency (per-stage: lookup/queue/encap/roce/translate/forward, one param per hw-controller block) | folded into per-dimension `latency` (network YAML) |
 | Encapsulation goodput (3-field header + coalescing efficiency at the run's message-size mix) | folded into per-dimension `bandwidth` |
 | Posted-write source-local completion | eager mode (default; sender completes at injection) |
 | Baseline RDMA large-message handshake | `--rendezvous-protocol true` (existing CLI flag) |
@@ -95,29 +95,44 @@ Three tiers, all Chakra ET format (the simulator sees no difference):
   then, bound it by charging cross-rack traffic to both dims in a worst-case
   variant.
 
-## Placeholder constants (until testbed calibration)
+## Constants: who owns each number
 
-All Loom-favoring constants are placeholders to be replaced by measurements
-from the Coyote/U280 prototype (paper repo `design-docs/implementation-plan.md`
-Phases 0–5); each is swept in the sensitivity plan regardless.
+### ⚑ FPGA-owned (MUST be measured on the Coyote/U280 testbed)
 
-| Constant | Placeholder | Source (eventually) |
+One parameter per hw-controller pipeline block; each is read from a
+per-stage cycle counter (or ILA) in the vFPGA, then frequency-scaled for
+the ASIC argument. Placeholders below hold until then.
+
+| Config param | hw-controller block | Placeholder | Measured by |
+|---|---|---|---|
+| `--t-lookup` | Source Validation + Route Selector (range match → binding) | 25 ns | T3, stage counter |
+| `--t-queue` | Per-Destination Transmit Queues + Scheduler (uncontended) | 75 ns | T3, stage counter |
+| `--t-encap` | TX Encapsulator | 100 ns | T3, stage counter |
+| `--roce-stack-ns` | QP Router + RoCEv2 engine per side (RX incl. RX Decapsulator) | 150 ns | Coyote RoCE RC ping-pong floor |
+| `--t-translate` | Transaction Generator (Bounds Checker + Address Translation) | 15 ns | T3, stage counter |
+| `--t-forward` | Local Forward Engine egress | 10 ns | T3, stage counter |
+| Loom goodput vs message size (coalescing curve) | TX Encapsulator coalescer | 0.947 flat (header math only; coalescing benefit deliberately unmodeled) | T2 curve, coalescer on/off |
+| read RTT + credit behavior | Read Credit Tracker | remote-mem-latency 5000 ns | T6 |
+| B2 rdma-init | (baseline, same hosts) | 2800 ns | testbed CPU-verbs post+poll run |
+| substrate floors (fabric store latency, DMA BW, RoCE ping-pong) | — | fabric 500 ns etc. | Phase 0 floors; every Loom number reported as overhead over these |
+
+Derived sums (coarse sweep overrides `--pipe-ns`/`--pipe-local-ns`):
+local adder = lookup+translate+forward = 50; source remote pipeline =
+lookup+queue+encap = 200; destination = translate+forward = 25 (no range
+lookup — the connection identifies the binding).
+
+### Published / validated (no FPGA needed)
+
+| Constant | Value | Source |
 |---|---|---|
-| `t_pipe` (remote route, per ToR) | 500 ns | encap/translate pipeline; testbed T3; swept 100 ns–5 µs |
-| `t_pipe_local` (in-rack adder) | 50 ns | binding lookup + bounds over stock switch forwarding — the ToR IS the rack switch, whose forwarding is already in fabric latency; testbed T3 (vs raw Coyote forwarding) |
-| endpoint-delay (ALL systems) | 10 ns | VALIDATED: ASTRA-sim's HGX-H100-validated.json endpoint-delay, calibrated vs real HGX; route-invariant store-issue cost (ideal B3 keeps 1 ns; event queue rejects 0) |
-| inter-ToR wire+switch | 600 ns | cut-through ToR datasheets (300-800ns, Tomahawk/Trident class) + propagation |
-| B1 rdma-init (dim1 only) | 2400 ns | GPU-initiated small put ~3us end-to-end: NVIDIA IBGDA blog / NVSHMEM perf docs; swept |
-| B2 rdma-init (dim1 only) | 2800 ns | ib_write_lat ~1.6-2us (perftest, Kalia ATC'16) + GPU->proxy handoff ~1-1.5us (NCCL proxy); swept |
-| Loom roce_stream (per ToR traversal, inside the pipeline) | 150 ns | streaming packet-engine share only (no WQE/doorbell/QP-fetch/payload-DMA on the data path — connections are control-path); Coyote RoCE floor replaces; set 0 if t_pipe measured inclusive |
-| RoCE goodput | 0.95 | header math: Eth+IP+UDP+BTH ~78B on 4KB MTU |
-| Loom goodput | 0.947 | RoCE goodput x 4096/4108 (12B Loom header); coalescing benefit at small sizes = testbed T2 curve |
-| scale-up hop (alt. preset) | 936.25 ns | ASTRA-sim's HGX-H100-validated.yml (validated vs real HGX) |
-
-With these anchored, the ONLY Loom-specific unmeasured constants are
-`t_pipe` (swept 100ns-5us; testbed T3) and the coalescing goodput curve
-(testbed T2).
-| B1 SM reservation | 20 of 132 SMs (DeepSeek-V3) | swept {8, 20, 32} |
+| endpoint-delay (ALL systems) | 10 ns | ASTRA-sim HGX-H100-validated.json (validated vs real HGX); ideal B3 keeps 1 ns (event queue rejects 0) |
+| inter-ToR wire+switch | 600 ns | cut-through ToR datasheets (300–800 ns class) + propagation |
+| B1 rdma-init (dim1 only) | 2400 ns | ≈3 µs end-to-end GPU-initiated put (NVIDIA IBGDA blog / NVSHMEM docs); swept |
+| RoCE goodput | 0.95 | header math (Eth+IP+UDP+BTH ≈78 B on 4 KB MTU) |
+| Loom goodput | 0.947 | RoCE goodput × 4096/4108 (12 B ⟨offset·op·len⟩ header) |
+| scale-up hop (alt. preset) | 936.25 ns | ASTRA-sim HGX-H100-validated.yml |
+| B1 SM reservation | 20 of 132 SMs | DeepSeek-V3; swept {8, 20, 32} |
+| `--uplink-oversub` | 1.0 (equal wires) | fairness choice; swept |
 
 ## Running everything
 

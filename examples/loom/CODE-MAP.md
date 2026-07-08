@@ -3,7 +3,7 @@
 > **Keep this updated with every commit that adds/changes code.** For each
 > artifact: what was written, and how it corresponds to the real Loom system
 > (the paper's design; eventually the Coyote/U280 prototype and an ASIC ToR).
-> Last updated: 2026-07-08 (D13 per-stage pipeline params).
+> Last updated: 2026-07-08 (D13 + ⚑ FPGA annotations; README constants section rewritten).
 
 ## 1. Simulator extensions (C++)
 
@@ -88,8 +88,8 @@ fields — the same technique as AstraSim's validated `HGX-H100-validated.yml`
 | `--uplink-oversub` | Loom ToR uplink aggregate vs the baseline's M per-GPU NICs (equal-wires default) |
 | `--dim1-topology Switch\|Ring\|FullyConnected` | inter-ToR fabric shape |
 
-\* = testbed-owned placeholder (T3), swept; everything else is
-published/validated (provenance table in README).
+\* = ⚑ FPGA-owned (T3 stage counters / Coyote floors), swept; everything
+else published/validated (README → "Constants: who owns each number").
 
 **Known gap (disclosed):** orthogonal dims let Loom's cross-rack traffic
 bypass dim0 capacity — matches the baseline's separate NIC, flatters Loom's
