@@ -185,9 +185,40 @@ examples/loom/gen_stg_workloads.sh dense /tmp/gpt64 --dp 4 --tp 4 --pp 4
 python3 examples/loom/workload/gen_p2p_patterns.py --pattern incast --out /tmp/i
 ```
 
-**Network/system configs**: `gen_network_config.py --mode {loom,baseline,ideal}`
-(knobs: `--pipe-ns --loom-goodput --uplink-oversub --dim1-topology`);
-system JSONs in `system/` (roofline variants for STG workloads).
+**Network/system configs**: `gen_network_config.py --mode {loom,baseline,ideal}`.
+Knobs: per-stage pipeline params (`--t-lookup --t-queue --t-encap
+--t-translate --t-forward --roce-stack-ns`, one per hw-controller block;
+coarse overrides `--pipe-ns`/`--pipe-local-ns` for sweeps), `--loom-goodput
+--uplink-oversub --dim1-topology --switch-egress`. System JSONs in
+`system/` (roofline variants for STG workloads).
+
+## VOQ vs shared-FIFO egress (what it is, where it applies, how to toggle)
+
+**What a VOQ is.** With a single shared output queue, the packet at the
+head blocks everything behind it whenever *its* destination is busy — one
+congested destination stalls traffic to every healthy one (head-of-line
+blocking). Virtual Output Queuing (VOQ), the standard switch-design remedy,
+gives each destination its own egress queue, so a congested destination
+grows only its own backlog. In Loom this is the design's **per-destination
+transmit queues** (paper §6.4): the mechanism behind the isolation claim
+that one slow remote peer must not stall an XPU's traffic to others.
+
+**Where it is used in the simulation.** Only in the **congestion-aware**
+binary (`AstraSim_Analytical_Congestion_Aware`) — the tier that actually
+models queues. It backs the isolation experiments (`run_victim.sh`, Sim-V1;
+incast patterns from `gen_p2p_patterns.py`). The congestion-unaware tier
+(all sweeps/matrix/apps) has no queues at all, so the setting is
+meaningless there. Constraint: the congestion-aware backend is 1-dim only,
+so these runs model the ToR as a flat switch.
+
+**When it is enabled.** VOQ is the **default and the backend's stock
+behavior** (each egress link already has a private queue) — nothing to
+enable. The strawman is what gets switched on: network-YAML key
+`switch_egress: shared_fifo` (added in the `astra-network-analytical`
+fork) forces one shared egress FIFO with head-of-line blocking. Emit it
+via `gen_network_config.py --switch-egress shared_fifo` or write the key
+by hand; omit it (or `per_destination`) for VOQ. Verified contrast: victim
+FCT is bit-identical to solo under VOQ, 3.2x inflated under shared_fifo.
 
 Notes: STG needs `tqdm` (fetch_stg.sh installs it); results/ is gitignored;
 sweeps accept env overrides (e.g. `KS="1 10" run_regime_map.sh`,
