@@ -58,7 +58,8 @@ examples/loom/
 │   └── gen_read_pattern.py    independent MEM_LOADs (credit experiments)
 │
 ├── run_smoke.sh               endpoint models on shipped all-to-all ETs
-├── run_victim.sh              Sim-V1: VOQ vs shared-FIFO isolation
+├── run_victim.sh              OPTIONAL standalone demo (not in run_all;
+│                              paper claims no congestion isolation)
 ├── run_sweep_credits.sh       S-5: read-credit cap sweep (1..64 + infinite)
 ├── run_sweep_tpipe.sh         S-1: source-pipeline break-even vs B1
 ├── run_regime_map.sh          gain vs comm-boundedness (SM ceiling)

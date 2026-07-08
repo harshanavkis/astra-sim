@@ -1,6 +1,6 @@
 # CHECKPOINT — Loom project state
 
-> **Last updated: 2026-07-08 (paper moved congestion to Discussion; victim demo demoted).** LIVING DOCUMENT — overwritten in place with
+> **Last updated: 2026-07-08 (victim demo excluded from suite; SharedFifo kept dormant).** LIVING DOCUMENT — overwritten in place with
 > every change (user mandate), alongside `CODE-MAP.md`. Written for session
 > restart on a possibly different server: read this first; it contains
 > everything needed to resume. Lives in the astra-sim repo (branch

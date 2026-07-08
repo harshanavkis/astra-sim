@@ -3,7 +3,7 @@
 > **Keep this updated with every commit that adds/changes code.** For each
 > artifact: what was written, and how it corresponds to the real Loom system
 > (the paper's design; eventually the Coyote/U280 prototype and an ASIC ToR).
-> Last updated: 2026-07-08 (paper moved congestion to Discussion; victim demo demoted).
+> Last updated: 2026-07-08 (victim demo excluded from suite; SharedFifo kept dormant).
 
 ## 1. Simulator extensions (C++)
 
@@ -126,7 +126,7 @@ speed (not trace durations) is the faithful model.
 | Script | Stresses (design §) | Current result (anchored constants) |
 |---|---|---|
 | `run_smoke.sh` | endpoint models on shipped ETs | sanity ordering; comm-only so no SM term |
-| `run_victim.sh` | discussion-supporting demo (congestion moved out of design) | solo = VOQ (77,024 = 77,024), SharedFifo 3.2× |
+| `run_victim.sh` | OPTIONAL standalone demo, excluded from run_all (paper claims no isolation) | solo = VOQ (77,024 = 77,024), SharedFifo 3.2× |
 | `run_sweep_credits.sh` | §6.3 read credits | exact linear concurrency scaling |
 | `run_sweep_tpipe.sh` | §6.1 switch cost (break-even) | break-even ≈ 1.6 µs; 500 ns placeholder wins |
 | `run_regime_map.sh` | §2 #4 SM reclamation vs comm-boundedness | gain → SM ceiling (~15%) compute-bound; parity comm-bound |
