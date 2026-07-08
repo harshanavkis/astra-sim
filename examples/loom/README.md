@@ -104,12 +104,18 @@ Phases 0–5); each is swept in the sensitivity plan regardless.
 | Constant | Placeholder | Source (eventually) |
 |---|---|---|
 | `t_loom_pipe` | 500 ns | testbed T3 (pipeline microbench); swept 100 ns–5 µs |
-| Loom goodput factor (dim1) | 0.94 | testbed T2 (goodput vs size, coalescer on) |
-| Baseline RoCE goodput (dim1) | 0.90 | measured Coyote RoCE RC efficiency |
 | endpoint-delay (ALL systems) | 10 ns | VALIDATED: ASTRA-sim's HGX-H100-validated.json endpoint-delay, calibrated vs real HGX; route-invariant store-issue cost (ideal B3 keeps 1 ns; event queue rejects 0) |
-| B1 rdma-init (dim1 only) | 1500 ns | GPU-initiated per-op cost: NVIDIA IBGDA blog / NVSHMEM perf docs; swept |
-| B2 rdma-init (dim1 only) | 2500 ns | CPU proxy post+poll: perftest ib_write_lat class, Kalia ATC'16; testbed-measured eventually |
+| inter-ToR wire+switch | 600 ns | cut-through ToR datasheets (300-800ns, Tomahawk/Trident class) + propagation |
+| B1 rdma-init (dim1 only) | 2400 ns | GPU-initiated small put ~3us end-to-end: NVIDIA IBGDA blog / NVSHMEM perf docs; swept |
+| B2 rdma-init (dim1 only) | 2800 ns | ib_write_lat ~1.6-2us (perftest, Kalia ATC'16) + GPU->proxy handoff ~1-1.5us (NCCL proxy); swept |
+| Loom RoCE stack (dim1) | 700 ns | NIC-class stack processing the Loom switch pays too; testbed T3 replaces |
+| RoCE goodput | 0.95 | header math: Eth+IP+UDP+BTH ~78B on 4KB MTU |
+| Loom goodput | 0.947 | RoCE goodput x 4096/4108 (12B Loom header); coalescing benefit at small sizes = testbed T2 curve |
 | scale-up hop (alt. preset) | 936.25 ns | ASTRA-sim's HGX-H100-validated.yml (validated vs real HGX) |
+
+With these anchored, the ONLY Loom-specific unmeasured constants are
+`t_pipe` (swept 100ns-5us; testbed T3) and the coalescing goodput curve
+(testbed T2).
 | B1 SM reservation | 20 of 132 SMs (DeepSeek-V3) | swept {8, 20, 32} |
 
 ## Running everything

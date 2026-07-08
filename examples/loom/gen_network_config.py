@@ -30,7 +30,9 @@ MODES = ("loom", "baseline", "ideal")
 def build_yaml(args) -> str:
     if args.mode == "loom":
         lat0 = args.fabric_latency + args.pipe_ns
-        lat1 = args.net_latency + 2 * args.pipe_ns  # source + destination ToR
+        # source + destination ToR pipelines + the RoCE stack the Loom
+        # switch itself uses (baselines' published numbers include their NIC)
+        lat1 = args.net_latency + args.roce_stack_ns + 2 * args.pipe_ns
         # equal-wires provisioning: ToR uplink aggregate = M NICs' aggregate,
         # divided by the explicit oversubscription factor
         bw1 = args.net_bw * args.loom_goodput / args.uplink_oversub
@@ -69,19 +71,24 @@ def main():
                    help="rack fabric wire+hop ns (default 500)")
     p.add_argument("--net-bw", type=float, default=50.0,
                    help="inter-ToR GB/s per uplink (default: 400GbE)")
-    p.add_argument("--net-latency", type=float, default=2000.0,
-                   help="inter-ToR one-way ns (default 2000)")
+    p.add_argument("--net-latency", type=float, default=600.0,
+                   help="inter-ToR wire+switch one-way ns (cut-through ToR "
+                        "class, 300-800ns datasheets + propagation)")
     # Loom / baseline constants (placeholders; see README table)
     p.add_argument("--pipe-ns", type=float, default=500.0,
                    help="Loom switch pipeline latency t_loom_pipe (placeholder 500)")
-    p.add_argument("--loom-goodput", type=float, default=0.94,
+    p.add_argument("--loom-goodput", type=float, default=0.947,
                    help="Loom encap goodput factor at the run's message mix")
-    p.add_argument("--roce-goodput", type=float, default=0.90,
+    p.add_argument("--roce-goodput", type=float, default=0.95,
                    help="baseline RoCE goodput factor")
-    p.add_argument("--rdma-init-ns", type=float, default=1500.0,
-                   help="baseline per-op RDMA initiation cost, folded into "
-                        "dim1 (B1 GPU-initiated ~1500, B2 CPU proxy ~2500; "
-                        "perftest/IBGDA-class placeholders, swept)")
+    p.add_argument("--roce-stack-ns", type=float, default=700.0,
+                   help="RoCE/NIC stack processing paid by the Loom switch "
+                        "on the cross-rack route (NIC-class; testbed T3)")
+    p.add_argument("--rdma-init-ns", type=float, default=2400.0,
+                   help="baseline per-op RDMA initiation cost after the wire, "
+                        "folded into dim1 (B1 GPU-initiated 2400 -> ~3us "
+                        "end-to-end, IBGDA/NVSHMEM-class; B2 CPU proxy 2800 "
+                        "-> ib_write_lat + proxy handoff; swept)")
     p.add_argument("--dim1-topology", choices=("Switch", "Ring", "FullyConnected"),
                    default="Switch", help="inter-ToR topology (default Switch)")
     p.add_argument("--uplink-oversub", type=float, default=1.0,

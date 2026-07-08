@@ -21,7 +21,7 @@ for T in "${TOPOS[@]}"; do
   NPUS=$((RACKS * XPUS))
   python3 $GEN --mode loom     --racks $RACKS --xpus-per-rack $XPUS $EXTRA -o /tmp/net_loom.yml
   python3 $GEN --mode baseline --racks $RACKS --xpus-per-rack $XPUS $EXTRA -o /tmp/net_base.yml
-  python3 $GEN --mode baseline --racks $RACKS --xpus-per-rack $XPUS --rdma-init-ns 2500 $EXTRA -o /tmp/net_b2.yml
+  python3 $GEN --mode baseline --racks $RACKS --xpus-per-rack $XPUS --rdma-init-ns 2800 $EXTRA -o /tmp/net_b2.yml
   python3 $GEN --mode ideal    --racks $RACKS --xpus-per-rack $XPUS $EXTRA -o /tmp/net_ideal.yml
   for C in $COLLS; do
     for S in $SIZES; do
