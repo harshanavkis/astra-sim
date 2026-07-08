@@ -106,7 +106,7 @@ Phases 0–5); each is swept in the sensitivity plan regardless.
 | `t_loom_pipe` | 500 ns | testbed T3 (pipeline microbench); swept 100 ns–5 µs |
 | Loom goodput factor (dim1) | 0.94 | testbed T2 (goodput vs size, coalescer on) |
 | Baseline RoCE goodput (dim1) | 0.90 | measured Coyote RoCE RC efficiency |
-| endpoint-delay (ALL systems) | 1 ns | route-invariant store-issue cost; a baseline GPU talking to an in-rack peer issues a plain store too |
+| endpoint-delay (ALL systems) | 10 ns | VALIDATED: ASTRA-sim's HGX-H100-validated.json endpoint-delay, calibrated vs real HGX; route-invariant store-issue cost (ideal B3 keeps 1 ns; event queue rejects 0) |
 | B1 rdma-init (dim1 only) | 1500 ns | GPU-initiated per-op cost: NVIDIA IBGDA blog / NVSHMEM perf docs; swept |
 | B2 rdma-init (dim1 only) | 2500 ns | CPU proxy post+poll: perftest ib_write_lat class, Kalia ATC'16; testbed-measured eventually |
 | scale-up hop (alt. preset) | 936.25 ns | ASTRA-sim's HGX-H100-validated.yml (validated vs real HGX) |
