@@ -109,7 +109,7 @@ Phases 0–5); each is swept in the sensitivity plan regardless.
 | inter-ToR wire+switch | 600 ns | cut-through ToR datasheets (300-800ns, Tomahawk/Trident class) + propagation |
 | B1 rdma-init (dim1 only) | 2400 ns | GPU-initiated small put ~3us end-to-end: NVIDIA IBGDA blog / NVSHMEM perf docs; swept |
 | B2 rdma-init (dim1 only) | 2800 ns | ib_write_lat ~1.6-2us (perftest, Kalia ATC'16) + GPU->proxy handoff ~1-1.5us (NCCL proxy); swept |
-| Loom RoCE stack (per ToR traversal, inside the pipeline) | 350 ns | transport processing composes into t_pipe (2x350 = NIC-class total); T3 measures pipe+stack together, substrate floor separates them — set 0 if t_pipe already includes it |
+| Loom roce_stream (per ToR traversal, inside the pipeline) | 150 ns | streaming packet-engine share only (no WQE/doorbell/QP-fetch/payload-DMA on the data path — connections are control-path); Coyote RoCE floor replaces; set 0 if t_pipe measured inclusive |
 | RoCE goodput | 0.95 | header math: Eth+IP+UDP+BTH ~78B on 4KB MTU |
 | Loom goodput | 0.947 | RoCE goodput x 4096/4108 (12B Loom header); coalescing benefit at small sizes = testbed T2 curve |
 | scale-up hop (alt. preset) | 936.25 ns | ASTRA-sim's HGX-H100-validated.yml (validated vs real HGX) |

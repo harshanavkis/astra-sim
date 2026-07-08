@@ -3,7 +3,7 @@
 > **Keep this updated with every commit that adds/changes code.** For each
 > artifact: what was written, and how it corresponds to the real Loom system
 > (the paper's design; eventually the Coyote/U280 prototype and an ASIC ToR).
-> Last updated: 2026-07-08 (through commit: roce-stack folded into per-traversal pipeline).
+> Last updated: 2026-07-08 (roce_stream = streaming share only, 150 ns; see ANALYTICAL-MODEL.md).
 
 ## 1. Simulator extensions (C++)
 
@@ -81,7 +81,7 @@ fields — the same technique as AstraSim's validated `HGX-H100-validated.yml`
 | Config term | Physical thing |
 |---|---|
 | dim0 latency = fabric + `t_pipe_local` (50 ns*) | in-rack peer store: the Loom ToR IS the rack switch (stock forwarding is inside fabric latency); Loom adds only binding lookup + bounds check (design §6.1 "adds only table lookups") |
-| dim1 latency = wire (600 ns, cut-through ToR class) + 2·(`t_pipe` 500 ns* + `roce_stack` 350 ns) | cross-rack peer store: per ToR traversal, one composite pipeline = Loom logic (validate/match/encap resp. decap/bounds/translate) + the transport (RoCE) processing inside the same switch — no separate RDMA initiation exists in Loom; T3 measures the composite (substrate floor separates the transport share; zero roce_stack if t_pipe is measured inclusive) |
+| dim1 latency = wire (600 ns, cut-through ToR class) + 2·(`t_pipe` 500 ns* + `roce_stream` 150 ns) | cross-rack peer store: per ToR traversal, one composite pipeline = Loom logic (validate/match/encap resp. decap/bounds/translate) + the transport (RoCE) processing inside the same switch — no separate RDMA initiation exists in Loom; T3 measures the composite (substrate floor separates the transport share; zero roce_stack if t_pipe is measured inclusive) |
 | dim1 bandwidth × 0.947 | RoCE goodput 0.95 (header math) × 4096/4108 (12 B ⟨offset·op·len⟩ Loom header) |
 | baseline dim1 latency = wire + `rdma-init` (B1 2400 ns, B2 2800 ns) | per-RDMA-op initiation, paid once per rack crossing; ≈3 µs end-to-end GPU-initiated put (IBGDA/NVSHMEM), resp. ib_write_lat + NCCL proxy handoff |
 | baseline dim0 = fabric only | an in-rack baseline peer access is a plain store too — route-split, user-identified fix |

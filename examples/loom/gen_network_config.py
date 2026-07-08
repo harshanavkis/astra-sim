@@ -90,12 +90,15 @@ def main():
                    help="Loom encap goodput factor at the run's message mix")
     p.add_argument("--roce-goodput", type=float, default=0.95,
                    help="baseline RoCE goodput factor")
-    p.add_argument("--roce-stack-ns", type=float, default=350.0,
-                   help="transport (RoCE) processing per ToR traversal, "
-                        "INSIDE the switch pipeline (2x350 = NIC-class "
-                        "total). Testbed T3 measures pipe+stack together "
-                        "(the substrate RoCE ping-pong floor separates "
-                        "them); set 0 if --pipe-ns already includes it")
+    p.add_argument("--roce-stack-ns", type=float, default=150.0,
+                   help="transport STREAMING share per ToR traversal, "
+                        "inside the switch pipeline: packet build/ICRC/CC "
+                        "state only. Loom initiates no work requests on "
+                        "the data path (connections pre-established in the "
+                        "control path; no doorbell/WQE/payload DMA - those "
+                        "are precisely the baseline rdma-init components). "
+                        "Coyote RoCE floor measures this; set 0 if "
+                        "--pipe-ns is measured inclusive")
     p.add_argument("--rdma-init-ns", type=float, default=2400.0,
                    help="baseline per-op RDMA initiation cost after the wire, "
                         "folded into dim1 (B1 GPU-initiated 2400 -> ~3us "
