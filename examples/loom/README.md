@@ -232,6 +232,17 @@ grows only its own backlog. In Loom this is the design's **per-destination
 transmit queues** (paper §6.4): the mechanism behind the isolation claim
 that one slow remote peer must not stall an XPU's traffic to others.
 
+**Not to be confused with read credits** (paper §6.3, simulated by
+`LOOM_PEER_READS`): both defend the fabric's finite credit/tag space, but
+against different traffic. VOQ protects **posted writes** — without it, a
+congested destination fills switch buffers until link-level credit
+withholding stalls the source XPU's whole link (PCIe backpressure can only
+say "stop everything"). Read credits protect against **non-posted reads** —
+each outstanding read holds a completion tag/credit for the full
+(cross-rack) round trip, so an uncapped stream of remote reads would
+exhaust the fabric's tag space; the budget makes further reads wait
+instead.
+
 **Where it is used in the simulation.** Only in the **congestion-aware**
 binary (`AstraSim_Analytical_Congestion_Aware`) — the tier that actually
 models queues. It backs the isolation experiments (`run_victim.sh`, Sim-V1;
