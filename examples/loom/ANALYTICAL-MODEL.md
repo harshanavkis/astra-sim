@@ -1,9 +1,26 @@
 # The analytical model, number by number (inspection document)
 
-> **Last updated: 2026-07-08 (D10: asymmetric remote traversals).** Living document (CLAUDE.md rule 1). Every
+> **Last updated: 2026-07-08 (D11 edge legs, D12 t_pipe=200; four-case walkthrough added).** Living document (CLAUDE.md rule 1). Every
 > constant and modeling decision in the simulation, with its value,
 > decomposition, what it includes/excludes per system, provenance, and the
 > reasoning — so each can be inspected and vetoed individually.
+
+## 0. The four cases at a glance (one peer write)
+
+Every case: XPU issues a store (endpoint-delay 10 ns, identical everywhere)
++ the steps below + size/BW serialization.
+
+| Case | Steps | Total |
+|---|---|---|
+| **Loom in-rack** | fabric traversal incl. stock switching (500) + t_pipe_local lookup adder (50) | **560 ns** |
+| **Loom cross-rack** | edge fabric legs XPU↔ToR both ends (500) + source ToR lookup/match/encap `t_pipe` (200) + RoCE TX stream (150) + wire (600) + RoCE RX stream (150) + dest delivery = same work as in-rack `t_pipe_local` (50) | **1660 ns** |
+| **Baseline in-rack** | fabric traversal (500) — a plain peer store, no RDMA machinery exists on this route | **510 ns** |
+| **Baseline cross-rack** | create WQE + doorbell (every transfer) + NIC: WQE fetch/QP ctx/payload DMA/packet + wire + receive NIC = `rdma_init` 2400 + wire 600, from the ≈3 µs end-to-end anchor (which already includes its PCIe legs) | **3010 ns** |
+
+Loom never pays: WQE/doorbell/QP-fetch/payload-DMA (done once at binding
+time, control path). Baseline in-rack never pays anything Loom-like except
+that Loom adds 50 ns of lookup. The cross-rack gap (1660 vs 3010) is the
+moved-to-setup machinery.
 
 ## 1. The latency equations
 
@@ -15,9 +32,11 @@ message, route-invariant) + per-hop dimension latency (network YAML) +
 
 ```
               dim0 (in-rack)                    dim1 (cross-rack)
-Loom     :  fabric + t_pipe_local          wire + (t_pipe + roce_stream)      [source ToR]
-           = 500 + 50        = 550 ns          + (roce_stream + t_pipe_local) [destination ToR]
-                                          = 600 + 650 + 200 = 1450 ns
+Loom     :  fabric + t_pipe_local          fabric legs (both ends)            = 500
+           = 500 + 50        = 550 ns          + (t_pipe + roce_stream)   [source ToR] = 350
+                                               + wire                                  = 600
+                                               + (roce_stream + t_pipe_local) [dest]   = 200
+                                                                            total 1650 ns
 B1 (GPU) :  fabric           = 500 ns     wire + rdma_init_B1 = 600 + 2400 = 3000 ns
 B2 (proxy): fabric           = 500 ns     wire + rdma_init_B2 = 600 + 2800 = 3400 ns  (+ rendezvous)
 B3 (ideal): fabric           = 500 ns     wire                = 600 ns
@@ -60,7 +79,7 @@ RoCE RX + decap + the *same* check/translate/forward that local delivery
 uses — both routes converge on the transaction generator (design §6.1) —
 so it costs `t_pipe_local`, not a second `t_pipe`. Only the RoCE streaming
 share is paid at both ends (the baseline pays its receive-side NIC too,
-inside its end-to-end anchor). So `dim1(Loom) = 1450 ns` vs
+inside its end-to-end anchor). So `dim1(Loom) = 1650 ns` vs
 `dim1(B1) = 3000 ns`: the gap **is** the moved-to-setup work-request
 machinery, which is the paper's claim rendered as arithmetic. If the claim is wrong, the testbed
 will say so: T3 measures the composite per-traversal cost through Coyote's
@@ -75,7 +94,7 @@ transport share. **Accounting rule: never add `roce_stream` on top of a
 | `endpoint-delay` | 10 ns (all systems) | issuing one store toward the fabric | everything route-dependent | AstraSim `HGX-H100-validated.json` (validated) | — |
 | `fabric_latency` | 500 ns | rack fabric hop incl. stock switch forwarding | Loom's added lookups | PCIe5-switch class; alt preset: HGX 936.25 ns validated | testbed floor |
 | `t_pipe_local` | 50 ns* | binding lookup + bounds over stock forwarding | full remote pipeline | pipelined SRAM lookups, ASIC-class estimate | **T3** (Loom local path vs raw Coyote forwarding) |
-| `t_pipe` | 500 ns* | validate/match/encap resp. decap/bounds/translate, per traversal | transport streaming share | placeholder, swept 100 ns–5 µs | **T3** (remote path) |
+| `t_pipe` | 200 ns* | SOURCE-side lookup/match/encap only | transport streaming; destination work (that is t_pipe_local) | ASIC-class pipelined lookups ~100–300 ns; swept 100 ns–5 µs | **T3** (remote path; FPGA reads higher — sweep carries the FPGA/ASIC argument) |
 | `roce_stream` | 150 ns | packet build/ICRC/CC state per traversal | WQE/doorbell/QP-fetch/payload-DMA (Loom never does these on the data path) | HW packet-engine class | **Coyote RoCE floor** |
 | `wire` (`--net-latency`) | 600 ns | inter-ToR cut-through switch + propagation | endpoint anything | ToR datasheets (300–800 ns class) | — |
 | `rdma_init_B1` | 2400 ns | full per-op initiation (table above) minus wire | — | ≈3 µs end-to-end GPU-initiated put (IBGDA blog, NVSHMEM docs) | swept {S-4} |
@@ -115,6 +134,13 @@ transport share. **Accounting rule: never add `roce_stream` on top of a
   favors Loom; congestion-tier item).
 - **D9 — no hand-authored applications**: shipped ETs, STG published
   shapes, or captured traces only.
+- **D11 — edge legs included** *(user-identified)*: Loom's dim1 adds one
+  full fabric traversal for the XPU↔ToR legs at both ends; the baseline's
+  end-to-end anchor already contains its PCIe legs, so only Loom's
+  decomposed path needed them added explicitly.
+- **D12 — t_pipe is source-side lookup/encap only** *(user-identified)*:
+  after D4/D5/D10 the remaining content of t_pipe is a few pipelined table
+  lookups + header prepend → ASIC-class 200 ns, not 500.
 - **D10 — asymmetric remote traversals** *(user-identified)*: destination-
   side remote work = the local-route delivery pipeline (`t_pipe_local`),
   not a second full `t_pipe`; RoCE streaming share at both ends. Charging

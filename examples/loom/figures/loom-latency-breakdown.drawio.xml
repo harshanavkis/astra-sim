@@ -28,23 +28,26 @@
         <mxCell id="l2" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=9;align=left;fontStyle=1" value="Loom, cross-rack&#xa;(dim1)" vertex="1">
           <mxGeometry x="120" y="478" width="130" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="l2a" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=8" value="SOURCE ToR: t_pipe&#xa;(validate·match·encap) 500 ns" vertex="1">
-          <mxGeometry x="260" y="474" width="130" height="34" as="geometry" />
+        <mxCell id="l2a" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=#666666;fontSize=8" value="edge fabric legs&#xa;(XPU↔ToR, both ends) 500 ns" vertex="1">
+          <mxGeometry x="260" y="474" width="90" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="l2f" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=8" value="SRC ToR: t_pipe&#xa;(lookup·encap) 200 ns" vertex="1">
+          <mxGeometry x="350" y="474" width="90" height="34" as="geometry" />
         </mxCell>
         <mxCell id="l2b" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#99CCFF;strokeColor=#6c8ebf;fontSize=8" value="roce_stream TX&#xa;150 ns" vertex="1">
-          <mxGeometry x="390" y="474" width="80" height="34" as="geometry" />
+          <mxGeometry x="440" y="474" width="70" height="34" as="geometry" />
         </mxCell>
         <mxCell id="l2c" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=#666666;fontSize=8" value="wire + Eth switch&#xa;600 ns" vertex="1">
-          <mxGeometry x="470" y="474" width="80" height="34" as="geometry" />
+          <mxGeometry x="510" y="474" width="70" height="34" as="geometry" />
         </mxCell>
         <mxCell id="l2d" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#99CCFF;strokeColor=#6c8ebf;fontSize=8" value="roce_stream RX&#xa;150 ns" vertex="1">
-          <mxGeometry x="550" y="474" width="80" height="34" as="geometry" />
+          <mxGeometry x="580" y="474" width="70" height="34" as="geometry" />
         </mxCell>
         <mxCell id="l2e" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=8" value="DEST ToR: t_pipe_local&#xa;(decap·translate) 50 ns" vertex="1">
-          <mxGeometry x="630" y="474" width="80" height="34" as="geometry" />
+          <mxGeometry x="650" y="474" width="80" height="34" as="geometry" />
         </mxCell>
-        <mxCell id="l2t" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=9;align=left;fontFamily=Courier" value="= 1450 ns" vertex="1">
-          <mxGeometry x="720" y="484" width="80" height="14" as="geometry" />
+        <mxCell id="l2t" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=9;align=left;fontFamily=Courier" value="= 1650 ns" vertex="1">
+          <mxGeometry x="740" y="484" width="80" height="14" as="geometry" />
         </mxCell>
         <mxCell id="l2n" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=8;align=left;fontStyle=2" value="t_pipe paid ONCE (source only); destination = the local delivery pipeline (routes converge on the transaction generator)" vertex="1">
           <mxGeometry x="260" y="510" width="470" height="12" as="geometry" />

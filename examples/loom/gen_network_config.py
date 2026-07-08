@@ -37,7 +37,12 @@ def build_yaml(args) -> str:
         # check/translate/forward the local route does (both routes converge
         # on the transaction generator, design 6.1) -> t_pipe_local, not a
         # second t_pipe. T3 measures the end-to-end sum.
-        lat1 = (args.net_latency
+        # plus the physical edge legs (XPU->source ToR, dest ToR->XPU):
+        # one full fabric traversal, same elements as an in-rack trip. The
+        # baseline's rdma_init anchor is end-to-end and already includes
+        # its PCIe legs, so only Loom needs them added explicitly.
+        lat1 = (args.fabric_latency
+                + args.net_latency
                 + (args.pipe_ns + args.roce_stack_ns)
                 + (args.roce_stack_ns + args.pipe_local_ns))
         # equal-wires provisioning: ToR uplink aggregate = M NICs' aggregate,
@@ -82,9 +87,12 @@ def main():
                    help="inter-ToR wire+switch one-way ns (cut-through ToR "
                         "class, 300-800ns datasheets + propagation)")
     # Loom / baseline constants (placeholders; see README table)
-    p.add_argument("--pipe-ns", type=float, default=500.0,
-                   help="Loom REMOTE-route pipeline per ToR traversal "
-                        "(encap/translate; placeholder 500, swept; testbed T3)")
+    p.add_argument("--pipe-ns", type=float, default=200.0,
+                   help="Loom SOURCE-side remote pipeline: lookup/match/encap "
+                        "only (transport + destination work priced "
+                        "separately). ASIC-class pipelined lookups ~100-300ns "
+                        "-> placeholder 200, swept; testbed T3 (FPGA will "
+                        "read higher; sweep carries the FPGA/ASIC argument)")
     p.add_argument("--pipe-local-ns", type=float, default=50.0,
                    help="Loom LOCAL-route adder over stock switch forwarding "
                         "(binding lookup + bounds; pipelined table lookups, "
