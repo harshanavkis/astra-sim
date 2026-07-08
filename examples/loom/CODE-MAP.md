@@ -3,7 +3,7 @@
 > **Keep this updated with every commit that adds/changes code.** For each
 > artifact: what was written, and how it corresponds to the real Loom system
 > (the paper's design; eventually the Coyote/U280 prototype and an ASIC ToR).
-> Last updated: 2026-07-08 (victim demo excluded from suite; SharedFifo kept dormant).
+> Last updated: 2026-07-08 (suite inventory table added to README).
 
 ## 1. Simulator extensions (C++)
 

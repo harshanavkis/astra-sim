@@ -170,6 +170,22 @@ lookup — the connection identifies the binding).
 Entries marked **[verify exact figure]** have a solid source *class* but the
 specific value should be pinned to a page/table before the paper cites it.
 
+## Suite inventory (what runs, what it produces)
+
+`run_all.sh` = 6 experiments, **231 simulator invocations**, ~10–15 min in
+Docker (matrix dominates). Each experiment writes one CSV to `results/`;
+`plot_results.py` renders one PDF per CSV (skips missing ones).
+
+| Experiment | Sim runs | CSV (columns) | Plot | Shows |
+|---|---|---|---|---|
+| smoke | 4 (Loom,B1,B2,B3) | `smoke.csv` (system, wall_cycles, exposed_comm_cycles) | `smoke.pdf` bars | endpoint-model sanity on shipped ETs (comm-only) |
+| sweep_credits | 8 (credits 1…64, 2^20=∞) | `sweep_credits.csv` (read_credits, wall_cycles) | `credits.pdf` log-log line | exact linear concurrency scaling; ∞ = uncapped design |
+| sweep_tpipe | 7 (6 t_pipe × Loom + B1) | `sweep_tpipe.csv` (system, t_pipe_ns, wall_cycles) | `tpipe.pdf` curve + B1 line | source-pipeline break-even (~2 µs) |
+| regime_map | 12 (6 compute-speeds × 2) | `regime_map.csv` (compute_speedup, loom, b1, gain_pct, exposed_comm_pct) | `regime.pdf` gain curve + SM ceiling | where Loom wins: gain → 15% ceiling compute-bound, parity comm-bound |
+| matrix | 192 (4 topo × 4 coll × 3 sizes × 4 sys) | `matrix.csv` (topology, collective, size_mb, system, wall, exposed) | `matrix.pdf` 4-panel gain grid (16 MB) | traffic patterns × topologies coverage |
+| apps | 8 (4 configs × Loom/B1) | `apps.csv` (app, ranks, system, wall, exposed) | `apps.pdf` gain bars | Mixtral MoE +7.5/+15%, GPT-3 +5% (published shapes) |
+| *(optional)* victim | 3 (solo/voq/shared_fifo) | `victim.csv` (case, victim_fct_cycles) | `victim.pdf` bars | standalone demo only; not in run_all |
+
 ## Running everything
 
 **One command (host side)** — builds the Docker image if missing, runs the
