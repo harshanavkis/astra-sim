@@ -1,7 +1,10 @@
 # Working rules for this repo (Loom simulation, branch `loom-sim`)
 
 Start here when resuming: `examples/loom/CHECKPOINT.md` (project state),
-`examples/loom/CODE-MAP.md` (what every piece of code models),
+`examples/loom/HANDOFF-EVAL-REVIEW.md` (2026-08 evaluation-review session:
+verdicts, integrity findings, decisions, phased implementation plan A–D —
+the current work queue), `examples/loom/CODE-MAP.md` (what every piece of
+code models; its result numbers are stale until the Phase-A rerun),
 `examples/loom/README.md` (how to run).
 
 ## Standing rules (from the project owner)

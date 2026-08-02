@@ -3,7 +3,11 @@
 > **Keep this updated with every commit that adds/changes code.** For each
 > artifact: what was written, and how it corresponds to the real Loom system
 > (the paper's design; eventually the Coyote/U280 prototype and an ASIC ToR).
-> Last updated: 2026-07-08 (per-experiment rationale added to README).
+> Last updated: 2026-08-02 (no code change; `HANDOFF-EVAL-REVIEW.md` added —
+> evaluation-review session record with data-integrity findings and the
+> phased implementation plan. NOTE: this file's result numbers are stale
+> vs `results/*.csv`; CHECKPOINT §5 holds the reconciled values, and the
+> Phase-A suite rerun (see HANDOFF §6) is the trigger to rewrite them here).
 
 ## 1. Simulator extensions (C++)
 
