@@ -50,9 +50,12 @@
 > coalescer is still needed in RTL for this), substrate floors (Phase 0
 > baselines), and B2 rdma-init (CPU-verbs post+poll on the testbed
 > hosts). B1 rdma-init is measured on a GPU+NIC box, not the FPGA
-> testbed. Remaining prototype roadmap (Coyote README status table):
-> 5.1b loomd split -> 5.2 hardware gates G1/G2/G4 -> 5.3 first hardware
-> run + T3/T2/floor measurements -> 6.1/6.2 two-host RDMA (resolves G3).
+> testbed. Remaining prototype roadmap (Coyote README status table;
+> reads moved up per owner direction 2026-08-03): 5.2 aperture reads,
+> local path (sim-tested) -> 5.3 loomd split -> 5.4 hardware gates
+> G1/G2/G4 -> 5.5 first hardware run + T3/T2/floor/local-read-RTT
+> measurements -> 6.1/6.2 two-host RDMA (resolves G3; remote reads via
+> shell RDMA READ, T6 remote RTT).
 
 > **UPDATE (2026-07-07): binding-first addressing; no tokens, no tags, no
 > sequence numbers.** The datapath keys on per-aperture binding entries (see

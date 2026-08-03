@@ -11,7 +11,9 @@
 > (correcting an earlier same-day edit that briefly marked them
 > optional), Phase 6 tier-1 built; testbed deliverables = the FPGA-owned
 > constants (T3 stage latencies, T2 coalescing curve, T6 read RTT,
-> floors, B2 rdma-init). Prior update 2026-08-02:
+> floors, B2 rdma-init). Reads moved UP in the prototype roadmap (owner
+> direction 2026-08-03): local read path is the next phase, before the
+> loomd software split. Prior update 2026-08-02:
 > evaluation-review session closed out: `HANDOFF-EVAL-REVIEW.md` added —
 > full session record, verdicts, integrity findings, decisions, phased
 > implementation plan A–D, reviewer defenses. Prior updates 07-27/28:
