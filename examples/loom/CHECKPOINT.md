@@ -79,7 +79,14 @@ to astra-sim repo `examples/loom/figures/`.
 
 - `implementation-plan.md` — Coyote/U280 testbed plan (Phases 0–6), swept
   clean of tokens/GFA/NAT; Coyote's RoCE stack = transport, vFPGA does only
-  translations. **Testbed work NOT started.**
+  translations. **Testbed work NOT started; NO Coyote code exists yet.**
+  **Tracked copy now lives at `examples/loom/implementation-plan.md`**
+  (2026-08-03, survives migration; banner states precedence). Known
+  staleness vs 07-27/28 decisions: its Phase 4 (victim/failure, 3 wk) is
+  DESCOPED; Phase-6 "VOQ demonstrated on prototype" and the §6.4 paper
+  mapping are obsolete (no isolation claim). Cutting Phase 4 puts the
+  NSDI-minimum path (Phases 0–3 + calibration + validation gate) at
+  ~9–12 wk.
 - `simulation-eval-plan.md` — AstraSim plan + eval plan (S0–S8 phases,
   T1–T11 testbed experiments, sensitivity S-1…S-6, fairness F1–F4).
 - `evaluation-methodology.md` — THE methodology record: RQ1–RQ6, metric
