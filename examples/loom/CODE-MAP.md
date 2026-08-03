@@ -3,7 +3,14 @@
 > **Keep this updated with every commit that adds/changes code.** For each
 > artifact: what was written, and how it corresponds to the real Loom system
 > (the paper's design; eventually the Coyote/U280 prototype and an ASIC ToR).
-> Last updated: 2026-08-03 evening (no sim-code change; `implementation-plan.md` promoted to authoritative and updated: testbed work STARTED — Coyote-repo `examples/loom/` prototype is simulation-complete through phase 5.1a; eval-review descopes annotated inline (Phase 4 victim/failure dead, reads PLANNED scoped to T6 read-RTT calibration, Phase 6 tier-1 built; testbed owes T3 stage latencies, T2 coalescing curve, T6 read RTT, substrate floors, B2 rdma-init). Prior 2026-08-03 update: tracked copy of the Coyote testbed plan added at `examples/loom/implementation-plan.md` (was untracked in the paper repo — migration risk closed); `motivation/README.md` added, then revised: T3 GCP session marked CONDITIONAL — T0 trace analysis suffices for motivation, credits held in reserve with explicit triggers —
+> Last updated: 2026-08-03 late (no sim-code change; T3 stage cycle
+> counters IMPLEMENTED in the Coyote prototype (phase 5.3b, owner
+> move-up ahead of 6.2a): RO CSR words 48-63 give cycle counter,
+> FIFO-residency accumulator (t-queue), per-stage cycle sums + op counts
+> for t-lookup/t-forward/t-encap and the dma/read/fence classes; all
+> sims green; README.md FPGA-owned intro + implementation-plan banner
+> updated — T3 needs only hardware runs now. Prior same-evening update:
+> `implementation-plan.md` promoted to authoritative and updated: testbed work STARTED — Coyote-repo `examples/loom/` prototype is simulation-complete through phase 5.1a; eval-review descopes annotated inline (Phase 4 victim/failure dead, reads PLANNED scoped to T6 read-RTT calibration, Phase 6 tier-1 built; testbed owes T3 stage latencies, T2 coalescing curve, T6 read RTT, substrate floors, B2 rdma-init). Prior 2026-08-03 update: tracked copy of the Coyote testbed plan added at `examples/loom/implementation-plan.md` (was untracked in the paper repo — migration risk closed); `motivation/README.md` added, then revised: T3 GCP session marked CONDITIONAL — T0 trace analysis suffices for motivation, credits held in reserve with explicit triggers —
 > ACE-style motivation-experiment record, hardware-tiered T0–T3 incl. the
 > €250 GCP budget plan. Prior: `HANDOFF-EVAL-REVIEW.md` added —
 > evaluation-review session record with data-integrity findings and the

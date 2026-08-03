@@ -131,7 +131,12 @@ Three tiers, all Chakra ET format (the simulator sees no difference):
 
 One parameter per hw-controller pipeline block; each is read from a
 per-stage cycle counter (or ILA) in the vFPGA, then frequency-scaled for
-the ASIC argument. Placeholders below hold until then.
+the ASIC argument. Placeholders below hold until then. The stage cycle
+counters are IMPLEMENTED and sim-tested in the prototype (Coyote
+examples/loom phase 5.3b, 2026-08-03: RO CSR words 48-63 — cycle
+counter, FIFO-residency accumulator for t-queue, per-stage cycle sums +
+op counts for t-lookup/t-forward/t-encap and the dma/read/fence
+classes); only the hardware runs remain to fill this table.
 
 | Config param | hw-controller block | Placeholder | Measured by |
 |---|---|---|---|

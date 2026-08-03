@@ -1,6 +1,13 @@
 # CHECKPOINT — Loom project state
 
-> **Last updated: 2026-08-03 (TESTBED WORK STARTED: the Coyote vFPGA
+> **Last updated: 2026-08-03, late (T3 STAGE CYCLE COUNTERS IMPLEMENTED,
+> owner move-up: prototype phase 5.3b adds RO CSR words 48-63 — cycle
+> counter, order-FIFO residency accumulator (t-queue), per-stage cycle
+> sums + op counts (t-lookup/t-forward/t-encap + dma/read/fence) — all
+> sims green (block TBs incl. exact-cycle checks, C++ integration 19x
+> PASS, Python exact counts); T3 now needs only hardware runs. The
+> FPGA-owned table intro in README.md and the implementation-plan banner
+> reflect this. Earlier same day, TESTBED WORK STARTED: the Coyote vFPGA
 > prototype now exists in the Coyote repo, `examples/loom/` — RTL
 > (ctrl/table/engine/rx/arbiter), 5 block TBs, integration sim via the
 > real cThread API, Python RDMA TX test, role-split sw, ALL GREEN in XSIM;

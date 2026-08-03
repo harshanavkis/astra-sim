@@ -50,12 +50,29 @@
 > coalescer is still needed in RTL for this), substrate floors (Phase 0
 > baselines), and B2 rdma-init (CPU-verbs post+poll on the testbed
 > hosts). B1 rdma-init is measured on a GPU+NIC box, not the FPGA
-> testbed. Remaining prototype roadmap (Coyote README status table;
+> testbed.
+>
+> **The T3 stage cycle counters are IMPLEMENTED and sim-tested
+> (2026-08-03, owner move-up: pulled to the top of the queue, before
+> 6.2a).** Coyote prototype phase 5.3b: RO CSR words 48-63 — free-running
+> cycle counter, order-FIFO residency accumulator (t-queue; push
+> timestamps carried in the FIFO entries), per-stage cycle accumulators +
+> completed-op counts (lookup = t-lookup incl. the user-logic bounds
+> check, store-local = t-forward, store-rdma = t-encap, dma-local/rdma,
+> read, fence). Averages = acc/cnt deltas scaled by the vFPGA clock;
+> measurement runs use homogeneous traffic per class. The shell-TLB part
+> of t-translate is invisible to posted writes and is bounded via the
+> read-stage round trip + substrate floors. Verified by block TBs (exact
+> 2-cycle unstalled stores, stall attribution, acc==2*pops invariant),
+> the C++ integration sim (19x PASS), and the Python framework (exact
+> counts). T3 itself remains testbed-owned: only the NUMBERS need
+> hardware. Remaining prototype roadmap (Coyote README status table;
 > reads moved up per owner direction 2026-08-03): 5.2 aperture reads,
-> local path (sim-tested) -> 5.3 loomd split -> 5.4 hardware gates
-> G1/G2/G4 -> 5.5 first hardware run + T3/T2/floor/local-read-RTT
-> measurements -> 6.1/6.2 two-host RDMA (resolves G3; remote reads via
-> shell RDMA READ, T6 remote RTT).
+> local path (sim-tested) -> 5.3 loomd split -> 5.3b stage counters
+> (DONE) -> 6.2a bundled two-host binary (code + FPGA-free smoke now) ->
+> 5.4 hardware gates G1/G2/G4 -> 5.5 first hardware run + T3/T2/floor/
+> local-read-RTT measurements -> 6.1/6.2 two-host RDMA (resolves G3;
+> remote reads via shell RDMA READ, T6 remote RTT).
 
 > **UPDATE (2026-07-07): binding-first addressing; no tokens, no tags, no
 > sequence numbers.** The datapath keys on per-aperture binding entries (see
