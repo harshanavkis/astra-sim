@@ -245,7 +245,7 @@ captured traces), T1 CPU+NIC we own (who-moves-the-bytes CPU demo;
 perftest → rdma_init_B2), T2 one GPU+NIC loopback (3-way
 SM-copy/copy-engine/NIC contention; IBGDA loopback recipe with
 NVSHMEM_DISABLE_P2P + HCA-counter verification + the CPU-vs-GPU-posted
-differential trick → rdma_init_B1), T3 **Google Cloud, €250 credits**
+differential trick → rdma_init_B1), T3 **Google Cloud, €250 credits — CONDITIONAL, held in reserve (triggers in README §T3)**
 (the only tier with real NCCL kernels + Nsight %SM-cycles; 2–4×A100
 Spot; hard budget rules in README §3 — debug free on Kaggle first,
 Spot-only, self-terminating instances, ≤€120 planned spend, explicitly

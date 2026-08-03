@@ -3,7 +3,7 @@
 > **Keep this updated with every commit that adds/changes code.** For each
 > artifact: what was written, and how it corresponds to the real Loom system
 > (the paper's design; eventually the Coyote/U280 prototype and an ASIC ToR).
-> Last updated: 2026-08-03 (no code change; `motivation/README.md` added —
+> Last updated: 2026-08-03 (no code change; `motivation/README.md` added, then revised: T3 GCP session marked CONDITIONAL — T0 trace analysis suffices for motivation, credits held in reserve with explicit triggers —
 > ACE-style motivation-experiment record, hardware-tiered T0–T3 incl. the
 > €250 GCP budget plan. Prior: `HANDOFF-EVAL-REVIEW.md` added —
 > evaluation-review session record with data-integrity findings and the

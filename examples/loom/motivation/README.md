@@ -93,13 +93,26 @@ Fallbacks: hand-rolled loopback RC QP with kernel-built WQE + doorbell
 (~200 LoC ibverbs); DOCA GPUNetIO samples (CX-6 Dx+). If all fail:
 literature + sweep.
 
-### T3 — Google Cloud session (€250 credit budget — see §3 before spending a cent)
+### T3 — Google Cloud session (€250 credits — **CONDITIONAL, decided 2026-08-03: hold in reserve**)
 
-What the credits buy that nothing above can: **real NCCL kernels**
-contending with compute, and a **real Nsight SM-cycle profile** (C3
-proper). Machine: one **a2-highgpu-2g or -4g (2–4×A100, NVLink), Spot**.
-Explicitly NOT: a3/H100-with-CX7 instances (≈€80+/h — the budget dies
-in 3 hours; K2 is not worth it, the loopback/fallback path covers it).
+T0-b covers the motivation: % of GPU **execution time** in comm kernels
+(word the claim as time, not "SM cycles" — traces hold durations, not
+counters), from real production captures, paired with the cited DeepSeek
+reservation. What traces can't give is **causality** (no control
+condition in a recording: comm kernels ran X ms, but what did they cost
+the overlapped compute?). T3 exists for exactly that. **Run T3 only if
+one of these triggers fires:** (a) the trace library lacks a usable MoE
+capture; (b) drafting/reviewing exposes the missing-causality gap as
+load-bearing; (c) we decide the copy-engine-vs-NCCL contrast is worth
+having as the motivation's centerpiece figure. Otherwise the credits
+stay unspent. Note the sim needs no T3 either: B1's SM model mimics a
+static reservation — a documented production POLICY (cited + swept is
+the faithful treatment), not a physical constant.
+
+If triggered: machine = one **a2-highgpu-2g or -4g (2–4×A100, NVLink),
+Spot**. Explicitly NOT: a3/H100-with-CX7 instances (≈€80+/h — the budget
+dies in 3 hours; K2 is not worth it, the loopback/fallback path covers
+it).
 
 - **T3-a. NCCL contention matrix (C4).** Async NCCL all-to-all +
   all-reduce (1–256 MB) overlapped with GEMM at MoE shapes; solo vs
