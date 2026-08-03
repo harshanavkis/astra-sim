@@ -3,7 +3,9 @@
 > **Keep this updated with every commit that adds/changes code.** For each
 > artifact: what was written, and how it corresponds to the real Loom system
 > (the paper's design; eventually the Coyote/U280 prototype and an ASIC ToR).
-> Last updated: 2026-08-02 (no code change; `HANDOFF-EVAL-REVIEW.md` added —
+> Last updated: 2026-08-03 (no code change; `motivation/README.md` added —
+> ACE-style motivation-experiment record, hardware-tiered T0–T3 incl. the
+> €250 GCP budget plan. Prior: `HANDOFF-EVAL-REVIEW.md` added —
 > evaluation-review session record with data-integrity findings and the
 > phased implementation plan. NOTE: this file's result numbers are stale
 > vs `results/*.csv`; CHECKPOINT §5 holds the reconciled values, and the

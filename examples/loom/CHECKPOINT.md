@@ -237,8 +237,25 @@ al., same ASTRA-sim 2 + Chakra stack, methodology directly transplantable):
    can't be measured (next-step #2); SM-k / goodput-bounds /
    oversubscription.
 
-**Motivation measurements** (fill §2 \tbd{}s; any GPU box): NCCL
-scale-up/scale-out backend LoC split; Nsight %SM-cycles during all-to-all.
+**Motivation measurements — see `motivation/README.md` (THE record,
+added 2026-08-03).** ACE-style methodology (ace_isca2021.pdf, Rashidi
+ISCA'21, same ASTRA-sim lineage), organized as hardware tiers:
+T0 no-hardware (NCCL backend LoC split; own analysis of MLCommons
+captured traces), T1 CPU+NIC we own (who-moves-the-bytes CPU demo;
+perftest → rdma_init_B2), T2 one GPU+NIC loopback (3-way
+SM-copy/copy-engine/NIC contention; IBGDA loopback recipe with
+NVSHMEM_DISABLE_P2P + HCA-counter verification + the CPU-vs-GPU-posted
+differential trick → rdma_init_B1), T3 **Google Cloud, €250 credits**
+(the only tier with real NCCL kernels + Nsight %SM-cycles; 2–4×A100
+Spot; hard budget rules in README §3 — debug free on Kaggle first,
+Spot-only, self-terminating instances, ≤€120 planned spend, explicitly
+NO a3/H100-CX7 machines). Evidence policy (README §0): evaluation
+constants measured-or-swept; motivation evidence measured where cheap,
+CITED where it is a production disclosure (DeepSeek's 20/132 stays a
+citation). Payoff: T3 contention factors replace the global roofline
+989/839 with a measured contention model for B1. ACE related-work note:
+its endpoint-vs-switch Table II concerns in-network AGGREGATION — Loom's
+switch runs no algorithm; ACE-class engines compose with Loom.
 
 **Supporting analyses**: QP/connection-state accounting script (analytic);
 sim-as-testbed validation gate (≤10–15% error, blocks all headlines);
