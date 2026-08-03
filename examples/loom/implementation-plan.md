@@ -29,11 +29,18 @@
 > claim, VOQ is standard switch art, and the 1-dim victim topology was
 > structurally vacuous. Original Phase 4 below is therefore dead; the
 > error containment unit and per-destination queues/scheduler will not
-> be built. Reads (original Phase 5) stay design-argued and
-> sim-modeled (credit-capped reads exist in the remote-memory fork);
-> hardware reads are OPTIONAL, only to calibrate T6's read-RTT
-> placeholder if time permits — the prototype is write-only, matching
-> the push-only GPU idiom.
+> be built. Reads (original Phase 5) are PLANNED, scoped to T6
+> calibration: the sweep policy expects the read RTT to land as a
+> MEASURED value (CHECKPOINT next-steps #9 lists T6 among the testbed
+> deliverables, and the credit-sweep experiment is active in Phase A).
+> Prototype scope: an aperture READ entry through the same order FIFO -
+> local reads pull 8 B from the destination buffer under its pid and
+> return it on the held-open AXI-Lite read channel (sim-testable via
+> getCSR); remote read RTT via the shell's RDMA READ path is
+> hardware-only (PCIe completion-timeout config watched, per the
+> original Phase 5 text). The credit *model* stays sim-side
+> (sweep_credits); AXI-Lite's single-outstanding read makes the
+> hardware tracker trivially depth-1 - state this in the paper.
 >
 > **What the testbed still owes the simulation** (README "FPGA-owned"
 > constants; measured, NOT swept, per decision #2): per-stage pipeline
@@ -304,7 +311,7 @@ A→Y (healthy) with/without per-destination queues; **failure experiment** —
 kill remote host mid-stream, measure detection→containment time, show other
 bindings unaffected.
 
-### Phase 5 — Reads (stretch, 2 wk) — **OPTIONAL ONLY (prototype is write-only; sim owns credit-capped reads via the remote-memory fork; hardware reads would only calibrate T6's read-RTT placeholder)**
+### Phase 5 — Reads (2 wk) — **PLANNED, scoped to T6 calibration (read RTT lands as a measured value per the sweep policy; credit MODEL stays sim-side in sweep_credits; hardware tracker is trivially depth-1 under AXI-Lite's single-outstanding reads)**
 Non-posted aperture reads with read-credit tracker (per-binding pending-read FIFO,
 credits, completion held open across RTT). Watch PCIe completion timeout
 config on the hosts. Measure local vs. remote read latency/outstanding

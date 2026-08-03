@@ -7,9 +7,11 @@
 > hardware phases 5.2+ pending testbed time. `implementation-plan.md`
 > here is now the AUTHORITATIVE plan, updated with an implementation-
 > status banner and the eval-review descopes applied inline: Phase 4
-> victim/failure DEAD, reads OPTIONAL, Phase 6 tier-1 built; testbed
-> deliverables reduced to the FPGA-owned constants (T3 stage latencies,
-> T2 coalescing curve, floors, B2 rdma-init). Prior update 2026-08-02:
+> victim/failure DEAD, reads PLANNED scoped to T6 read-RTT calibration
+> (correcting an earlier same-day edit that briefly marked them
+> optional), Phase 6 tier-1 built; testbed deliverables = the FPGA-owned
+> constants (T3 stage latencies, T2 coalescing curve, T6 read RTT,
+> floors, B2 rdma-init). Prior update 2026-08-02:
 > evaluation-review session closed out: `HANDOFF-EVAL-REVIEW.md` added —
 > full session record, verdicts, integrity findings, decisions, phased
 > implementation plan A–D, reviewer defenses. Prior updates 07-27/28:
