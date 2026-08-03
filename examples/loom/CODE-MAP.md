@@ -3,7 +3,12 @@
 > **Keep this updated with every commit that adds/changes code.** For each
 > artifact: what was written, and how it corresponds to the real Loom system
 > (the paper's design; eventually the Coyote/U280 prototype and an ASIC ToR).
-> Last updated: 2026-08-03 late (no sim-code change; T3 stage cycle
+> Last updated: 2026-08-03 late II (no sim-code change; 6.2a bundled
+> two-host binary code done in the Coyote prototype - sw-bundled/:
+> loomd<->loomd TCP peering + QP setup + remote rdma-window imports,
+> FPGA-free peering test 17x PASS, execution awaits the testbed; the
+> implementation-plan roadmap banner updated. Prior same-evening
+> update: T3 stage cycle
 > counters IMPLEMENTED in the Coyote prototype (phase 5.3b, owner
 > move-up ahead of 6.2a): RO CSR words 48-63 give cycle counter,
 > FIFO-residency accumulator (t-queue), per-stage cycle sums + op counts

@@ -69,10 +69,15 @@
 > hardware. Remaining prototype roadmap (Coyote README status table;
 > reads moved up per owner direction 2026-08-03): 5.2 aperture reads,
 > local path (sim-tested) -> 5.3 loomd split -> 5.3b stage counters
-> (DONE) -> 6.2a bundled two-host binary (code + FPGA-free smoke now) ->
-> 5.4 hardware gates G1/G2/G4 -> 5.5 first hardware run + T3/T2/floor/
-> local-read-RTT measurements -> 6.1/6.2 two-host RDMA (resolves G3;
-> remote reads via shell RDMA READ, T6 remote RTT).
+> (DONE) -> 6.2a bundled two-host binary (code DONE 2026-08-03,
+> `sw-bundled/`: loomd<->loomd TCP peering with staging-VA hello +
+> cross-host handle resolution, QP setup via cThread::initRDMA, remote
+> imports as rdma windows; FPGA-free peering test 17x PASS; EXECUTION
+> needs the two-host testbed) -> 5.4 hardware gates G1/G2/G4 -> 5.5
+> first hardware run + T3/T2/floor/local-read-RTT measurements ->
+> 6.1/6.2 two-host RDMA execution + full topology (resolves G3;
+> per-binding QPs, per-window staging; remote reads via shell RDMA READ,
+> T6 remote RTT).
 
 > **UPDATE (2026-07-07): binding-first addressing; no tokens, no tags, no
 > sequence numbers.** The datapath keys on per-aperture binding entries (see

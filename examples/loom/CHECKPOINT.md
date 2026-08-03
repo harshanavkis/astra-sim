@@ -1,6 +1,12 @@
 # CHECKPOINT — Loom project state
 
-> **Last updated: 2026-08-03, late (T3 STAGE CYCLE COUNTERS IMPLEMENTED,
+> **Last updated: 2026-08-03, late II (6.2a BUNDLED TWO-HOST BINARY CODE
+> DONE: Coyote `examples/loom/sw-bundled/` - loomd<->loomd TCP peering
+> (staging-VA hello, cross-host handle resolution, DONE barrier), QP
+> setup via cThread::initRDMA, BundledOrchestrator programs remote
+> imports as rdma windows (pid = local QP owner, base = exporter VA);
+> FPGA-free peering test 17x PASS; execution needs the two-host testbed.
+> Earlier same evening: T3 STAGE CYCLE COUNTERS IMPLEMENTED,
 > owner move-up: prototype phase 5.3b adds RO CSR words 48-63 — cycle
 > counter, order-FIFO residency accumulator (t-queue), per-stage cycle
 > sums + op counts (t-lookup/t-forward/t-encap + dma/read/fence) — all
