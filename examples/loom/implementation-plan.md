@@ -5,8 +5,47 @@
 > any git repo — this copy makes the hardware plan survive machine
 > migration alongside CHECKPOINT/HANDOFF. If the two ever diverge, the
 > paper repo's design-docs version is authoritative until testbed work
-> starts; after that, this one is. Status: **testbed work NOT started**
-> (CHECKPOINT §3); this document is the plan, no Coyote code exists yet.
+> starts; after that, this one is.
+
+> **UPDATE (2026-08-03, evening): testbed work STARTED — this copy is now
+> authoritative.** The vFPGA prototype lives in
+> `Coyote/examples/loom/` (own repo; see its README for status, run
+> instructions, HW-DESIGN.md for the architecture, WORKFLOW.md for the
+> worked example). Implemented and green in XSIM simulation: ctrl slave
+> (CSR page + 15x4KB aperture + arrival-ordered FIFO), window table,
+> engine (small stores <=8B + descriptor DMA with per-descriptor fence,
+> local + rdma routes), rx forwarder, engine/rx arbiter; five block TBs,
+> Coyote integration sim via the real cThread API, Python-framework RDMA
+> TX test, and role-split software (OrchClient/orchestrator/XPU, 5.1a).
+> Deployment decisions vs. the original text below: ONE vFPGA per host
+> (multi-region rejected: splits the switch state), aperture ops <=8B via
+> AXI-Lite only with bulk via DMA (no AXI4 bypass — shell stays stock),
+> source identity by partition convention (no attacker model).
+>
+> **Descopes applied from the 2026-08 evaluation review**
+> (`HANDOFF-EVAL-REVIEW.md` §4, owner decisions): the victim-flow/VOQ
+> isolation experiment, failure containment (T7), and control-plane
+> costs (T8) are PERMANENTLY DESCOPED — the paper makes no isolation
+> claim, VOQ is standard switch art, and the 1-dim victim topology was
+> structurally vacuous. Original Phase 4 below is therefore dead; the
+> error containment unit and per-destination queues/scheduler will not
+> be built. Reads (original Phase 5) stay design-argued and
+> sim-modeled (credit-capped reads exist in the remote-memory fork);
+> hardware reads are OPTIONAL, only to calibrate T6's read-RTT
+> placeholder if time permits — the prototype is write-only, matching
+> the push-only GPU idiom.
+>
+> **What the testbed still owes the simulation** (README "FPGA-owned"
+> constants; measured, NOT swept, per decision #2): per-stage pipeline
+> latencies via stage cycle counters (T3: t-lookup, t-translate,
+> t-forward, t-encap, roce-stack; t-queue only if a queue stage exists),
+> the coalescing/goodput curve with coalescer on/off (T2 — the TX
+> coalescer is still needed in RTL for this), substrate floors (Phase 0
+> baselines), and B2 rdma-init (CPU-verbs post+poll on the testbed
+> hosts). B1 rdma-init is measured on a GPU+NIC box, not the FPGA
+> testbed. Remaining prototype roadmap (Coyote README status table):
+> 5.1b loomd split -> 5.2 hardware gates G1/G2/G4 -> 5.3 first hardware
+> run + T3/T2/floor measurements -> 6.1/6.2 two-host RDMA (resolves G3).
 
 > **UPDATE (2026-07-07): binding-first addressing; no tokens, no tags, no
 > sequence numbers.** The datapath keys on per-aperture binding entries (see
@@ -256,7 +295,7 @@ host streams; same routing/encap; completion = descriptor retired when data
 accepted (posted semantics). Milestone: large transfers saturate link on
 both routes; crossover point small-store vs. DMA measured.
 
-### Phase 4 — Performance isolation + failure (3 wk)
+### Phase 4 — Performance isolation + failure (3 wk) — **DESCOPED (2026-08 eval review §4: no isolation claim; VOQ = standard switch art; victim topology vacuous; T7/T8 dropped)**
 Per-destination transmit queues (BRAM, DRAM spill if needed) + round-robin
 scheduler; error containment unit (binding error CSR: drop writes, poison
 reads, eventfd to agent).
@@ -265,13 +304,13 @@ A→Y (healthy) with/without per-destination queues; **failure experiment** —
 kill remote host mid-stream, measure detection→containment time, show other
 bindings unaffected.
 
-### Phase 5 — Reads (stretch, 2 wk)
+### Phase 5 — Reads (stretch, 2 wk) — **OPTIONAL ONLY (prototype is write-only; sim owns credit-capped reads via the remote-memory fork; hardware reads would only calibrate T6's read-RTT placeholder)**
 Non-posted aperture reads with read-credit tracker (per-binding pending-read FIFO,
 credits, completion held open across RTT). Watch PCIe completion timeout
 config on the hosts. Measure local vs. remote read latency/outstanding
 scaling. If timeouts prove hostile, document and restrict to DMA reads.
 
-### Phase 6 — AstraSim scale-out (3–4 wk, overlaps 4–5)
+### Phase 6 — AstraSim scale-out (3–4 wk, overlaps 4–5) — **Tier 1 BUILT AND RUNNING (this repo, examples/loom); remaining input = the FPGA-owned constants above**
 Principle: most of the Loom switch is *constants*, not behavior —
 translation/bounds/encap = per-hop latency adder + goodput factor, both
 measured on the prototype. Only congestion is behavioral, and the VOQ claim
@@ -311,9 +350,10 @@ estimate per Phase 0 Gate 2).
   (fix: `connection-scaling.md`).
 - **Coyote version drift:** pin to a release; Jigsaw's fork is the fallback.
 
-## Paper mapping
+## Paper mapping (post-descope)
 
-Phase 1–3 → implementation §7 + microbenchmarks; Phase 4 → §6.4/§6.5
-experiments (victim-flow is the money plot); Phase 5 → §6.3 evidence;
-Phase 6 → end-to-end evaluation; substrate baselines → overhead
-attribution (Loom vs. Coyote floor).
+Phase 1–3 → implementation §7 + microbenchmarks; Phase 6 → end-to-end
+evaluation; substrate baselines → overhead attribution (Loom vs. Coyote
+floor). Dead after the 2026-08 eval review: the victim-flow "money plot"
+(§6.4/§6.5) and the failure experiment; reads (§6.3) are argued from the
+design + sim credit model, with optional testbed calibration.

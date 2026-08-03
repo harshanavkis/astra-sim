@@ -1,11 +1,20 @@
 # CHECKPOINT — Loom project state
 
-> **Last updated: 2026-08-02 (evaluation-review session closed out:
-> `HANDOFF-EVAL-REVIEW.md` added — full session record, verdicts,
-> integrity findings, decisions, phased implementation plan A–D, reviewer
-> defenses. Prior updates 07-27/28: experiment catalog §5b, §5 reconciled
-> to CSVs, descoping + sweep-policy + positioning decisions, MoX
-> additions).** LIVING DOCUMENT — overwritten in place with
+> **Last updated: 2026-08-03 (TESTBED WORK STARTED: the Coyote vFPGA
+> prototype now exists in the Coyote repo, `examples/loom/` — RTL
+> (ctrl/table/engine/rx/arbiter), 5 block TBs, integration sim via the
+> real cThread API, Python RDMA TX test, role-split sw, ALL GREEN in XSIM;
+> hardware phases 5.2+ pending testbed time. `implementation-plan.md`
+> here is now the AUTHORITATIVE plan, updated with an implementation-
+> status banner and the eval-review descopes applied inline: Phase 4
+> victim/failure DEAD, reads OPTIONAL, Phase 6 tier-1 built; testbed
+> deliverables reduced to the FPGA-owned constants (T3 stage latencies,
+> T2 coalescing curve, floors, B2 rdma-init). Prior update 2026-08-02:
+> evaluation-review session closed out: `HANDOFF-EVAL-REVIEW.md` added —
+> full session record, verdicts, integrity findings, decisions, phased
+> implementation plan A–D, reviewer defenses. Prior updates 07-27/28:
+> experiment catalog §5b, §5 reconciled to CSVs, descoping + sweep-policy
+> + positioning decisions, MoX additions).** LIVING DOCUMENT — overwritten in place with
 > every change (user mandate), alongside `CODE-MAP.md`. Written for session
 > restart on a possibly different server: read this first; it contains
 > everything needed to resume. Lives in the astra-sim repo (branch
@@ -79,10 +88,12 @@ to astra-sim repo `examples/loom/figures/`.
 
 - `implementation-plan.md` — Coyote/U280 testbed plan (Phases 0–6), swept
   clean of tokens/GFA/NAT; Coyote's RoCE stack = transport, vFPGA does only
-  translations. **Testbed work NOT started; NO Coyote code exists yet.**
-  **Tracked copy now lives at `examples/loom/implementation-plan.md`**
-  (2026-08-03, survives migration; banner states precedence). Known
-  staleness vs 07-27/28 decisions: its Phase 4 (victim/failure, 3 wk) is
+  translations. **Testbed work STARTED (2026-08-03): prototype code in the
+  Coyote repo, `examples/loom/` (simulation-complete through phase 5.1a).**
+  **Tracked copy at `examples/loom/implementation-plan.md` is now
+  AUTHORITATIVE** (banner updated with implementation status + descopes
+  applied inline). Previously-known staleness now fixed in that copy: its
+  Phase 4 (victim/failure, 3 wk) is
   DESCOPED; Phase-6 "VOQ demonstrated on prototype" and the §6.4 paper
   mapping are obsolete (no isolation claim). Cutting Phase 4 puts the
   NSDI-minimum path (Phases 0–3 + calibration + validation gate) at
