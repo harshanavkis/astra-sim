@@ -206,6 +206,16 @@ root = working rules. Result numbers are generated into section 5 by
 
   Mechanism: a hierarchical collective spreads a roughly constant dim1 byte count over 2(r-1) steps, so per-step bytes fall as ~1/r while per-step LATENCY is fixed. Few racks = few fat steps = bandwidth-bound, hiding Loom's 1615-vs-3000 ns dim1 edge; many racks = many thin steps = latency-bound, where Loom wins. The exact +0.00% entries at small rack counts are that hiding, not parity.
 
+- Scale-up DOMAIN sweep (`domain_sweep.csv`) - STANDALONE (slow: 576 GPUs per point). **This experiment runs AGAINST Loom and must not be dropped.** Cluster size is held at 576 GPUs while the scale-up domain grows (HGX 8 -> NVL36 -> NVL72), so racks shrink and more traffic stays in-rack - traffic Loom does not change:
+
+| GPUs/rack | racks | all_reduce 1 MB | all_reduce 64 MB | all_to_all 1 MB | all_to_all 64 MB |
+|---|---|---|---|---|---|
+| 8 | 72 | +45.47% | +33.81% | +45.49% | +25.77% |
+| 36 | 16 | +37.83% | +0.00% | +17.54% | +2.56% |
+| 72 | 8 | +5.47% | +0.00% | +1.38% | +0.33% |
+
+  Read this honestly: at a FIXED cluster size, NVL72-class racks erase Loom's benefit almost entirely. The cause is rack COUNT (576 GPUs in 72-GPU racks is only 8 racks, inside the regime where dim1 latency is hidden), which is the same mechanism as the scale sweep. The defence is that NVL72 deployments are correspondingly LARGER, so rack count - and with it the cross-domain traffic fraction - recovers. That defence is NOT yet demonstrated: simulating 72-GPU racks beyond ~576 GPUs did not complete here, so it needs the validated analytical proxy (catalog B7/A5).
+
 - Break-even t_pipe (`sweep_tpipe.csv`) — STANDALONE, not in the default suite (optional reviewer-proofing; T3 will measure t_pipe): **3596 ns** (linear, 480 cycles/ns). Its durable use is showing the design tolerates a slow FPGA clock.
 - Regime map (`regime_map.csv`) — STANDALONE, not in the default suite; runs `--pipe-ns 500` so its Loom is NOT the Loom of the other experiments (see 5a.5). Rerun it before quoting:
   **13.9%** at 12% exposed comm -> **3.3%** at 91%. No negative point.
@@ -383,10 +393,31 @@ setup, in the regime where the divide costs least.
   design. Say this in the paper rather than letting a reader see a scaling
   failure.
 
-Prose must still address the counter-trend: NVL72-class racks enlarge the
-scale-up domain and shrink cross-rack traffic. Loom's answer is that racks
-still must talk at cluster scale, which is what the rack-count sweep
-shows.
+**THE NVL72 THREAT IS NOW MEASURED, AND IT IS SERIOUS
+(`run_domain_sweep.sh`, 2026-08-04).** Holding the cluster at 576 GPUs and
+growing the scale-up domain:
+
+| GPUs/rack | racks | ar 1 MB | ar 64 MB | a2a 1 MB | a2a 64 MB |
+|---|---|---|---|---|---|
+| 8 (HGX) | 72 | +45.47% | +33.81% | +45.49% | +25.77% |
+| 36 (NVL36) | 16 | +37.83% | +0.00% | +17.54% | +2.56% |
+| **72 (NVL72)** | **8** | **+5.47%** | **+0.00%** | **+1.38%** | **+0.33%** |
+
+At a fixed cluster size, NVL72-class racks erase Loom's benefit almost
+entirely - including at 1 MB, where it drops from +45% to +5%. This is the
+single strongest argument against the paper and must appear in it.
+
+The cause is the same mechanism as everywhere else: rack COUNT. 576 GPUs
+in 72-GPU racks is only 8 racks, and 71 of any rank's 575 peers are
+in-rack, so the divide barely bites. The defence is that NVL72 deployments
+are correspondingly LARGER (a 10k-GPU NVL72 cluster is ~140 racks), so the
+cross-domain traffic fraction recovers. **That defence is NOT yet
+demonstrated**: 72-GPU racks beyond ~576 GPUs would not complete here
+(ET generation unreliable and per-run time in the many minutes), so it
+needs the validated analytical proxy - catalog B7/A5 - which is exactly
+the MoX pattern already in the plan. Until that exists, the honest claim is
+that Loom's benefit scales with the FRACTION of traffic crossing scale-up
+domains, and that fraction is a deployment property, not a Loom property.
 
 **HOW THE all_reduce 64 MB CELL WENT FROM -0.31% TO +0.000% (2026-08-04).**
 It did not get better - it became a TIE, and the tie is forced. The
