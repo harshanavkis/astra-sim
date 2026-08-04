@@ -46,8 +46,25 @@ def build_yaml(args) -> str:
         # address translation on one die). T3 resolves this properly by
         # measuring the Loom datapath AGAINST raw Coyote forwarding, which
         # is a delta by construction.
+        # ...and the local-route increment is therefore ZERO by default
+        # (owner decision 2026-08-04). Loom does not bolt a translator onto
+        # someone else's switch: the Loom ToR IS the rack switch, and its
+        # in-rack datapath does exactly what any peer-store path already
+        # does. The prototype's own design table says so - a window table
+        # entry is "the compiled peer mapping behind the BAR window (which
+        # device, which offset), installed at import time, consulted per
+        # transaction" - and NVSwitch documents the same class of work
+        # (range-indexed routing tables, buffer over/underflow checks).
+        # What Loom ADDS over a stock switch is the remote route (lookup +
+        # queue + encap + RoCE), and that is charged in full in lat1 below.
+        # Charging an in-rack adder as well billed Loom for work the
+        # baseline's switch also does, inside the same 500 ns
+        # fabric_latency. Set --pipe-local-ns explicitly to model a Loom
+        # ToR that is WORSE than the switch it replaces; T3's FPGA delta is
+        # measured against the raw Coyote shell, which does no lookup at
+        # all, so it is an upper bound and not directly transferable here.
         pipe_local = (args.pipe_local_ns if args.pipe_local_ns is not None
-                      else args.t_lookup + args.t_translate)
+                      else 0.0)
         pipe_src = (args.pipe_ns if args.pipe_ns is not None
                     else args.t_lookup + args.t_queue + args.t_encap)
         # destination does NO range lookup (the connection identifies the
