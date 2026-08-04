@@ -216,6 +216,22 @@ root = working rules. Result numbers are generated into section 5 by
 
   Bounds which argument carries the paper in which deployment; it is NOT a refutation. SM reclamation is topology-INDEPENDENT (measured +10.72% compute gain at both 8 GPUs/rack x 32 racks and 64 GPUs/rack x 4 racks), Loom is never worse than B1 (the floor is parity, since crossing the network costs every system the same), and the removal of QPs/keys/buffers from the accelerator is not modelled here at all (catalog A9). What shrinks is the communication differential. At a FIXED cluster size, NVL72-class racks erase that differential almost entirely. The cause is rack COUNT (576 GPUs in 72-GPU racks is only 8 racks, inside the regime where dim1 latency is hidden), which is the same mechanism as the scale sweep. The defence is that NVL72 deployments are correspondingly LARGER, so rack count - and with it the cross-domain traffic fraction - recovers. That defence is NOT yet demonstrated: simulating 72-GPU racks beyond ~576 GPUs did not complete here, so it needs the validated analytical proxy (catalog B7/A5).
 
+- SM-reservation sweep (`sm_sweep.csv`, A6) - STANDALONE. There is no SM in ASTRA-sim: the tax is a roofline derating, `peak_perf = 989 * (132-k)/132` on the BASELINE only, since nothing runs on Loom's accelerators. k=20 is DeepSeek-V3's disclosed reservation. **k=0 isolates the pure communication benefit**, which is the most useful row here:
+
+| app | k | wall | comm | compute |
+|---|---|---|---|---|
+| gpt3_dense | 0 | +0.02% | +0.03% | +0.00% |
+| gpt3_dense | 8 | +1.88% | +1.42% | +5.61% |
+| gpt3_dense | 20 | +5.01% | +3.79% | +14.14% |
+| gpt3_dense | 32 | +8.61% | +6.58% | +22.78% |
+| mixtral_moe | 0 | +13.90% | +16.47% | +0.00% |
+| mixtral_moe | 8 | +14.40% | +16.20% | +5.21% |
+| mixtral_moe | 20 | +15.27% | +15.71% | +13.21% |
+| mixtral_moe | 32 | +16.44% | +15.22% | +21.50% |
+
+  The k=0 rows separate the two claims cleanly: for the dense LLM the communication benefit is essentially ZERO (+0.02% wall), so its entire gain is SM reclamation; for MoE the communication benefit carries it (+13.90% at k=0) and reclamation adds ~1.4pp. Quote them separately rather than reporting one blended number.
+  Model limitation, measured: `perf` is a `min()`, so only COMPUTE-BOUND nodes are derated and memory-bound ones escape the tax - the compute gain lands at +13.2/+14.1% instead of the ideal 20/132 = 15.15%. Deriving `local-mem-bw` by the same factor (`MEMBW=1`) recovers exactly 15.15% for both apps and moves wall to +15.68% / +5.54%. So the shipped model UNDER-states the SM tax, i.e. errs against Loom.
+
 - Break-even t_pipe (`sweep_tpipe.csv`) — STANDALONE, not in the default suite (optional reviewer-proofing; T3 will measure t_pipe): **3596 ns** (linear, 480 cycles/ns). Its durable use is showing the design tolerates a slow FPGA clock.
 - Regime map (`regime_map.csv`) — STANDALONE, not in the default suite; runs `--pipe-ns 500` so its Loom is NOT the Loom of the other experiments (see 5a.5). Rerun it before quoting:
   **13.9%** at 12% exposed comm -> **3.3%** at 91%. No negative point.

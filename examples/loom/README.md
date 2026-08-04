@@ -67,6 +67,10 @@ examples/loom/
 ├── run_victim.sh              OPTIONAL standalone demo (not in run_all;
 │                              paper claims no congestion isolation)
 ├── run_sweep_credits.sh       S-5: read-credit cap sweep (1..64 + infinite)
+├── run_sm_sweep.sh            A6 STANDALONE: reserved-SM sweep. k=0 row
+│                              isolates the PURE communication benefit
+├── run_domain_sweep.sh        STANDALONE: scale-up domain size (HGX 8 /
+│                              NVL36 / NVL72) at fixed cluster size
 ├── run_sweep_tpipe.sh         STANDALONE (not in run_all): break-even
 ├── run_regime_map.sh          STANDALONE (not in run_all): gain vs
 │                              comm-boundedness. Superseded for most uses
