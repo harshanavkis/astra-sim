@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Plot the Loom experiment-suite CSVs (examples/loom/results/*.csv -> .pdf).
 Requires matplotlib; skips any experiment whose CSV is missing.
+
+Axes are in TIME, not "cycles". The analytical backend ticks 1 cycle = 1 ns
+(verified against the model: in-rack 4 KB p2p is 8472 cycles for 8 iters =
+1059 ns each, vs 2x500 ns dim0 + 4 KiB/64 GiB/s = 1059.6 ns predicted), so
+every cycle count here is divided into us/ms rather than reported raw.
 """
 
 import csv
@@ -38,13 +43,13 @@ def plot_smoke():
         return
     fig, ax = plt.subplots(figsize=(4, 3))
     systems = [r["system"] for r in rows]
-    wall = [int(r["wall_cycles"]) / 1e3 for r in rows]
+    wall = [int(r["wall_cycles"]) / 1e3 for r in rows]        # ns -> us
     exposed = [int(r["exposed_comm_cycles"]) / 1e3 for r in rows]
     x = range(len(rows))
     ax.bar(x, wall, 0.6, label="wall", color="#8db4e2")
     ax.bar(x, exposed, 0.6, label="exposed comm", color="#c00000")
     ax.set_xticks(x, systems, rotation=20, ha="right", fontsize=8)
-    ax.set_ylabel("kilocycles")
+    ax.set_ylabel("time (us)")
     ax.set_title("Shipped all-to-all microbench (comm-only)", fontsize=9)
     ax.legend(fontsize=8)
     save(fig, "smoke.pdf")
@@ -61,7 +66,7 @@ def plot_victim():
     ax.bar(cases, fct, 0.6, color=colors[: len(rows)])
     for i, v in enumerate(fct):
         ax.text(i, v, f"{v:.0f}", ha="center", va="bottom", fontsize=8)
-    ax.set_ylabel("victim FCT (kilocycles)")
+    ax.set_ylabel("victim FCT (us)")
     ax.set_title("Victim isolation: ToR egress discipline (Sim-V1)", fontsize=9)
     save(fig, "victim.pdf")
 
@@ -72,11 +77,11 @@ def plot_credits():
         return
     fig, ax = plt.subplots(figsize=(4, 3))
     ax.plot([int(r["read_credits"]) for r in rows],
-            [int(r["wall_cycles"]) / 1e3 for r in rows], "o-", color="#4472c4")
+            [int(r["wall_cycles"]) / 1e3 for r in rows], "o-", color="#4472c4")  # ns -> us
     ax.set_xscale("log", base=2)
     ax.set_yscale("log")
     ax.set_xlabel("read credits per NPU")
-    ax.set_ylabel("completion (kilocycles)")
+    ax.set_ylabel("completion time (us)")
     ax.set_title("Read-credit cap sensitivity (S-5)", fontsize=9)
     save(fig, "credits.pdf")
 
@@ -88,13 +93,13 @@ def plot_tpipe():
     loom = [(int(r["t_pipe_ns"]), int(r["wall_cycles"])) for r in rows if r["system"] == "loom"]
     b1 = [int(r["wall_cycles"]) for r in rows if r["system"] == "b1_gpu_rdma"]
     fig, ax = plt.subplots(figsize=(4, 3))
-    ax.plot([t for t, _ in loom], [w / 1e6 for _, w in loom], "o-",
+    ax.plot([t for t, _ in loom], [w / 1e6 for _, w in loom], "o-",  # ns -> ms
             color="#4472c4", label="Loom")
     if b1:
         ax.axhline(b1[0] / 1e6, ls="--", color="#c00000", label="B1 GPU-RDMA")
     ax.set_xscale("log")
     ax.set_xlabel("t_pipe (ns)")
-    ax.set_ylabel("completion (Mcycles)")
+    ax.set_ylabel("completion time (ms)")
     ax.set_title("Switch-latency sensitivity, STG MoE (S-1)", fontsize=9)
     ax.legend(fontsize=8)
     save(fig, "tpipe.pdf")
@@ -154,6 +159,20 @@ def plot_matrix():
 
 
 def plot_p2p():
+    """M2: cross-rack p2p cost and its per-op amortization.
+
+    Two panels, cross-rack only, because cross-rack is the only route with a
+    meaningful baseline comparison: in-rack, Loom and B1 are identical by
+    construction (in-rack peer access is a plain store for every system) and
+    B2 differed only via the global rendezvous flag. Loom's in-rack curve is
+    still drawn in panel 1 as the reference floor - same binary, same store,
+    routed locally - but nothing is compared against it.
+
+    Time, not "cycles": this backend ticks 1 cycle = 1 ns. Checked against
+    the model both ways - in-rack 4 KB is 8472 for 8 iterations = 1059 ns
+    each vs 2x500 ns dim0 + 4 KiB/64 GiB/s = 1059.6 ns predicted, and
+    cross-rack 1 GB is 168.98e6 vs 168.4e6 predicted from bandwidth alone.
+    """
     rows = read("p2p_sweep.csv")
     if not rows:
         return
@@ -161,86 +180,58 @@ def plot_p2p():
     for r in rows:
         data.setdefault(r["route"], {}).setdefault(r["system"], {})[
             int(r["size_kb"])] = int(r["wall_cycles"])
-    routes = [r for r in ("in_rack", "cross_rack") if r in data]
-    colors = {"loom": "#70ad47", "b1_gpu_rdma": "#8db4e2",
-              "b2_cpu_proxy": "#c00000"}
-    # left column: absolute cost vs size (log-log) - the fixed per-op offset
-    # at small sizes is the whole story. right column: gain over B1.
-    fig, axes = plt.subplots(len(routes), 2, figsize=(8, 3 * len(routes)),
-                             squeeze=False)
-    # dashed + varied width so exactly-superimposed curves stay readable:
-    # in-rack, Loom and B1 are identical BY CONSTRUCTION (same dim0 config),
-    # and a reader must be able to see that rather than assume a missing line.
-    style = {"loom": (2.0, "-"), "b1_gpu_rdma": (1.2, "--"),
-             "b2_cpu_proxy": (1.2, "-")}
-    for i, route in enumerate(routes):
-        ax = axes[i][0]
-        for sysname, series in sorted(data[route].items()):
-            sizes = sorted(series)
-            lw, ls = style.get(sysname, (1.2, "-"))
-            ax.plot([s / 1024 for s in sizes], [series[s] / 1e3 for s in sizes],
-                    marker="o", ms=3, lw=lw, ls=ls, label=sysname,
-                    color=colors.get(sysname))
-        ax.set_xscale("log")
-        ax.set_yscale("log")
-        ax.set_xlabel("transfer size (MB)")
-        ax.set_ylabel("kilocycles")
-        ax.set_title(f"{route}: cost vs size", fontsize=9)
-        if i == 0:
-            ax.legend(fontsize=7)
+    if "cross_rack" not in data:
+        return
+    NS_PER_ITER = 8  # run_p2p_sweep.sh --iters; report per-transfer time
 
-        ax = axes[i][1]
-        loom = data[route].get("loom")
-        if route == "in_rack":
-            # NO baseline comparison is meaningful in-rack, so none is drawn.
-            # B1 is identical to Loom BY CONSTRUCTION (the model's own
-            # invariant: in-rack peer access is a plain store for every
-            # system), and B2 differs ONLY because --rendezvous-protocol is a
-            # global flag that charges a large-message handshake to that same
-            # plain store - drop the flag and B2 is byte-identical too.
-            # What the in-rack route IS good for is the reference floor: the
-            # same binary issuing the same store, routed locally instead of
-            # across racks. That ratio is the location-transparency result.
-            cross = data.get("cross_rack", {}).get("loom")
-            if loom and cross:
-                sizes = sorted(set(loom) & set(cross))
-                ratio = [cross[s] / loom[s] for s in sizes]
-                ax.plot([s / 1024 for s in sizes], ratio, marker="o", ms=3,
-                        lw=1.2, color="#4472c4")
-                ax.axhline(1, color="grey", lw=0.8)
-                ax.set_xscale("log")
-                ax.set_xlabel("transfer size (MB)")
-                ax.set_ylabel("cross-rack / in-rack cost")
-                ax.set_title("cost of location, same binary", fontsize=9)
-                ax.annotate("No baseline comparison is drawn in-rack:\n"
-                            "B1 is identical to Loom by construction\n"
-                            "(in-rack is a plain store for every system), and\n"
-                            "B2 differs only via the global rendezvous flag.\n"
-                            "T3 supplies the empirical in-rack delta.",
-                            xy=(0.03, 0.62), xycoords="axes fraction",
-                            fontsize=6.5, color="#555555")
-        else:
-            # B1 and B2 - the two real baselines. The B3 "ideal" system was
-            # removed from the suite on 2026-08-04: it is a bound, not a
-            # system anyone builds, so "gain over B3" is negative by
-            # definition (-160% at 4 KB) and squashed the real curves.
-            for base_name, label, colour in (
-                    ("b1_gpu_rdma", "vs B1 (GPU RDMA)", "#70ad47"),
-                    ("b2_cpu_proxy", "vs B2 (CPU proxy)", "#c00000")):
-                base = data[route].get(base_name)
-                if not (loom and base):
-                    continue
-                sizes = sorted(set(loom) & set(base))
-                gains = [100 * (base[s] - loom[s]) / base[s] for s in sizes]
-                ax.plot([s / 1024 for s in sizes], gains, marker="o", ms=3,
-                        lw=1.2, label=label, color=colour)
-            ax.axhline(0, color="grey", lw=0.8)
-            ax.set_xscale("log")
-            ax.set_xlabel("transfer size (MB)")
-            ax.set_ylabel("Loom gain (%)")
-            ax.set_title(f"{route}: per-op cost amortizes away", fontsize=9)
-            ax.legend(fontsize=7)
+    def us(cycles):  # cycles are ns; report microseconds per transfer
+        return cycles / 1e3 / NS_PER_ITER
+
+    fig, axes = plt.subplots(1, 2, figsize=(9, 3.4))
+
+    ax = axes[0]
+    for sysname, label, colour, lw, ls in (
+            ("loom", "Loom (cross-rack)", "#70ad47", 2.0, "-"),
+            ("b1_gpu_rdma", "B1 GPU-initiated RDMA", "#8db4e2", 1.4, "--"),
+            ("b2_cpu_proxy", "B2 CPU proxy", "#c00000", 1.4, "-")):
+        series = data["cross_rack"].get(sysname)
+        if not series:
+            continue
+        sizes = sorted(series)
+        ax.plot([s / 1024 for s in sizes], [us(series[s]) for s in sizes],
+                marker="o", ms=3, lw=lw, ls=ls, label=label, color=colour)
+    floor = data.get("in_rack", {}).get("loom")
+    if floor:
+        sizes = sorted(floor)
+        ax.plot([s / 1024 for s in sizes], [us(floor[s]) for s in sizes],
+                lw=1.0, ls=":", color="#555555",
+                label="Loom in-rack (reference floor)")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("transfer size (MB)")
+    ax.set_ylabel("time per transfer (us)")
+    ax.set_title("Cross-rack send/recv cost", fontsize=9)
+    ax.legend(fontsize=7)
+
+    ax = axes[1]
+    loom = data["cross_rack"].get("loom")
+    for base_name, label, colour in (("b1_gpu_rdma", "vs B1 (GPU RDMA)", "#70ad47"),
+                                     ("b2_cpu_proxy", "vs B2 (CPU proxy)", "#c00000")):
+        base = data["cross_rack"].get(base_name)
+        if not (loom and base):
+            continue
+        sizes = sorted(set(loom) & set(base))
+        ax.plot([s / 1024 for s in sizes],
+                [100 * (base[s] - loom[s]) / base[s] for s in sizes],
+                marker="o", ms=3, lw=1.2, label=label, color=colour)
+    ax.axhline(0, color="grey", lw=0.8)
+    ax.set_xscale("log")
+    ax.set_xlabel("transfer size (MB)")
+    ax.set_ylabel("Loom gain (%)")
+    ax.set_title("Per-operation cost amortizes away", fontsize=9)
+    ax.legend(fontsize=7)
     save(fig, "p2p.pdf")
+
 
 
 def plot_apps():

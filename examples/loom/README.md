@@ -212,7 +212,7 @@ Docker (matrix dominates). Each experiment writes one CSV to `results/`;
 | regime_map | 12 (6 compute-speeds × 2) | `regime_map.csv` (compute_speedup, loom, b1, gain_pct, exposed_comm_pct) | `regime.pdf` gain curve + SM ceiling | where Loom wins: gain vs comm-boundedness |
 | matrix | 72 (2 scales × 4 coll × 3 sizes × 3 sys; all `[Switch, Switch]`) | `matrix.csv` (topology, collective, size_mb, system, wall, exposed) | `matrix.pdf` gain grid, one row per size | scale × collective × size coverage (16 and 64 XPUs) |
 | apps | 8 (4 configs × Loom/B1) | `apps.csv` (app, ranks, system, wall, exposed) | `apps.pdf` gain bars | Mixtral MoE + GPT-3 at two scales (published shapes) |
-| p2p_sweep | 60 (2 routes × 10 sizes × 3 sys) | `p2p_sweep.csv` (route, size_kb, system, wall_cycles) | `p2p.pdf` cost-vs-size + gain-vs-size, per route | M2: per-op cost and its crossover; KB-granular, so unlike the collective grid it reaches 4 KB |
+| p2p_sweep | 60 (2 routes × 10 sizes × 3 sys) | `p2p_sweep.csv` (route, size_kb, system, wall_cycles) | `p2p.pdf` cross-rack time-per-transfer + gain vs size (in-rack shown only as the reference floor) | M2: per-op cost and its crossover; KB-granular, so unlike the collective grid it reaches 4 KB |
 | *(F2, answered)* run_f2.sh | 104 (matrix+apps under `direct`) | `matrix_direct.csv`, `apps_direct.csv` | — | ring-vs-direct control; on the deployed topology the two agree to 0.02%, so the question is moot |
 | *(optional)* victim | 3 (solo/voq/shared_fifo) | `victim.csv` (case, victim_fct_cycles) | `victim.pdf` bars | standalone demo only; not in run_all |
 
