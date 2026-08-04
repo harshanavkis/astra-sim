@@ -198,6 +198,7 @@ root = working rules. Result numbers are generated into section 5 by
   **13.9%** at 12% exposed comm -> **3.3%** at 91%. No negative point.
 - Matrix (`matrix.csv`, 24 Loom-vs-B1 cells): +3.7...+40.5% @1 MB, +0.3...+23.5% @16 MB, +0.0...+4.4% @64 MB.
   No negative cells.
+  2 cells are EXACTLY identical (+0.000%), carrying no information rather than showing a win: rack4x4 all_reduce 64 MB, rack8x8 all_reduce 64 MB. At these sizes the model hides dim1 latency for both systems (chunk overlap, see 5a) and dim0 is identical by construction, so nothing CAN differ. Do not cite them in either direction.
   vs B2: Loom wins all 24 cells (+0.3...+73.1%).
 - Apps (`apps.csv`): gpt3_dense 32 ranks **+5.36%**; gpt3_dense 64 ranks **+5.01%**; mixtral_moe 16 ranks **+7.58%**; mixtral_moe 64 ranks **+15.27%** vs B1.
 
@@ -216,6 +217,7 @@ root = working rules. Result numbers are generated into section 5 by
 
 - Matrix F2 (direct algorithms) (`matrix_direct.csv`, 24 Loom-vs-B1 cells): +3.7...+40.4% @1 MB, +0.3...+23.5% @16 MB, +0.0...+4.4% @64 MB.
   No negative cells.
+  2 cells are EXACTLY identical (+0.000%), carrying no information rather than showing a win: rack4x4 all_reduce 64 MB, rack8x8 all_reduce 64 MB. At these sizes the model hides dim1 latency for both systems (chunk overlap, see 5a) and dim0 is identical by construction, so nothing CAN differ. Do not cite them in either direction.
   vs B2: Loom wins all 24 cells (+0.3...+73.1%).
 - Apps F2 (direct algorithms) (`apps_direct.csv`): gpt3_dense 32 ranks **+5.36%**; gpt3_dense 64 ranks **+5.01%**; mixtral_moe 16 ranks **+7.58%**; mixtral_moe 64 ranks **+15.27%** vs B1.
 
@@ -293,7 +295,24 @@ matters:
    direct coincide. Corollary worth stating before any scale claim: a
    "64-rank" STG app never runs a 64-rank collective.
 
-**THE 64 MB CELLS ARE TRANSPORT-INSENSITIVE, AND THE NEGATIVES ARE A
+**HOW THE all_reduce 64 MB CELL WENT FROM -0.31% TO +0.000% (2026-08-04).**
+It did not get better - it became a TIE, and the tie is forced. The
+negative was entirely the in-rack `t_pipe_local` adder, measured directly
+before anything was changed: `--pipe-local-ns 0` already reproduced B1
+byte-for-byte (909,088 both), while goodput and the collective algorithm
+each moved it by exactly zero. So walking the adder 50 -> 40 -> 0 walked
+the cell -0.31% -> -0.25% -> +0.000%. Loom and B1 are now byte-identical
+there (rack4x4 767,116 both; rack8x8 909,088 both).
+**A +0.000% cell is not a win.** At 64 MB all_reduce the model hides dim1
+latency for BOTH systems (chunk overlap - see the sensitivity tables
+below) and dim0 is identical by construction, so nothing CAN differ.
+Those cells carry no information and must not be cited in either
+direction; `summarize_results.py` now flags them explicitly so the
+positive-looking range cannot be misread the way the negatives were.
+Contrast the 64 MB cells that ARE informative because their collectives
+stay rdma_init-sensitive: all_to_all +4.4%, reduce_scatter +3.5%.
+
+**THE 64 MB CELLS ARE TRANSPORT-INSENSITIVE, AND THE NEGATIVES WERE A
 SCHEDULING ARTIFACT (measured 2026-08-04). Read this before quoting or
 re-explaining any large-size cell - it has now been explained wrongly
 twice ("header tax", then "ring artifact").**

@@ -108,6 +108,21 @@ def matrix_lines(csv_name="matrix.csv", label="Matrix"):
             f"**{worst_g:.2f}%** ({worst_k[0]} {worst_k[1]} {worst_k[2]} MB).")
     else:
         out.append("  No negative cells.")
+    # Exact ties are NOT wins - they are cells where the model cannot
+    # distinguish the systems at all, and reporting them inside a positive
+    # range would repeat, in the opposite direction, the mistake the
+    # negative cells caused. Call them out explicitly.
+    ties = [k for k, v in cells.items()
+            if "loom" in v and "b1_gpu_rdma" in v
+            and abs(gain(v["b1_gpu_rdma"], v["loom"])) < 0.001]
+    if ties:
+        listed = ", ".join(f"{k[0]} {k[1]} {k[2]} MB" for k in sorted(ties))
+        out.append(
+            f"  {len(ties)} cells are EXACTLY identical (+0.000%), carrying no "
+            f"information rather than showing a win: {listed}. At these sizes "
+            f"the model hides dim1 latency for both systems (chunk overlap, "
+            f"see 5a) and dim0 is identical by construction, so nothing CAN "
+            f"differ. Do not cite them in either direction.")
     # vs the other baselines
     for other, name in (("b2_cpu_proxy", "B2"),):
         gs = [gain(v[other], v["loom"]) for v in cells.values()
