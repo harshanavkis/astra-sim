@@ -196,11 +196,11 @@ root = working rules. Result numbers are generated into section 5 by
 - Break-even t_pipe (`sweep_tpipe.csv`) — STANDALONE, not in the default suite (optional reviewer-proofing; T3 will measure t_pipe): **3596 ns** (linear, 480 cycles/ns). Its durable use is showing the design tolerates a slow FPGA clock.
 - Regime map (`regime_map.csv`) — STANDALONE, not in the default suite; runs `--pipe-ns 500` so its Loom is NOT the Loom of the other experiments (see 5a.5). Rerun it before quoting:
   **13.9%** at 12% exposed comm -> **3.3%** at 91%. No negative point.
-- Matrix (`matrix.csv`, 24 Loom-vs-B1 cells): +3.7...+40.5% @1 MB, +0.3...+23.5% @16 MB, +0.0...+4.4% @64 MB.
+- Matrix (`matrix.csv`, 24 Loom-vs-B1 cells): +3.7...+44.7% @1 MB, +0.3...+37.7% @16 MB, +0.0...+25.2% @64 MB.
   No negative cells.
-  2 cells are EXACTLY identical (+0.000%), carrying no information rather than showing a win: rack4x4 all_reduce 64 MB, rack8x8 all_reduce 64 MB. At these sizes the model hides dim1 latency for both systems (chunk overlap, see 5a) and dim0 is identical by construction, so nothing CAN differ. Do not cite them in either direction.
-  vs B2: Loom wins all 24 cells (+0.3...+73.1%).
-- Apps (`apps.csv`): gpt3_dense 32 ranks **+5.36%**; gpt3_dense 64 ranks **+5.01%**; mixtral_moe 16 ranks **+7.58%**; mixtral_moe 64 ranks **+15.27%** vs B1.
+  1 cells are EXACTLY identical (+0.000%), carrying no information rather than showing a win: 64gpu_8racks all_reduce 64 MB. At these sizes the model hides dim1 latency for both systems (chunk overlap, see 5a) and dim0 is identical by construction, so nothing CAN differ. Do not cite them in either direction.
+  vs B2: Loom wins all 24 cells (+0.3...+75.7%).
+- Apps (`apps.csv`): gpt3_dense 32 ranks **+5.07%**; gpt3_dense 64 ranks **+5.01%**; gpt3_dense 256 ranks **+2.38%**; mixtral_moe 16 ranks **+4.98%**; mixtral_moe 64 ranks **+15.27%**; mixtral_moe 256 ranks **+18.68%** vs B1.
 
   Gain decomposition (apps.csv) - the compute column is
   SM reclamation, structurally capped at 15.2% (= 1 - 839/989, the 20/132
@@ -209,17 +209,19 @@ root = working rules. Result numbers are generated into section 5 by
 
 | app | ranks | exposed comm | comm gain | compute gain | wall gain |
 |---|---|---|---|---|---|
-| gpt3_dense | 32 | 80.4% | +3.2% | +14.3% | **+5.36%** |
+| gpt3_dense | 32 | 78.5% | +2.5% | +14.3% | **+5.07%** |
 | gpt3_dense | 64 | 88.3% | +3.8% | +14.1% | **+5.01%** |
-| mixtral_moe | 16 | 62.8% | +4.2% | +13.4% | **+7.58%** |
+| gpt3_dense | 256 | 95.8% | +2.0% | +11.4% | **+2.38%** |
+| mixtral_moe | 16 | 59.1% | -0.8% | +13.4% | **+4.98%** |
 | mixtral_moe | 64 | 82.3% | +15.7% | +13.2% | **+15.27%** |
+| mixtral_moe | 256 | 94.3% | +19.2% | +10.7% | **+18.68%** |
 
 
-- Matrix F2 (direct algorithms) (`matrix_direct.csv`, 24 Loom-vs-B1 cells): +3.7...+40.4% @1 MB, +0.3...+23.5% @16 MB, +0.0...+4.4% @64 MB.
+- Matrix F2 (direct algorithms) (`matrix_direct.csv`, 24 Loom-vs-B1 cells): +1.1...+40.8% @1 MB, +0.1...+23.5% @16 MB, +0.0...+4.4% @64 MB.
   No negative cells.
-  2 cells are EXACTLY identical (+0.000%), carrying no information rather than showing a win: rack4x4 all_reduce 64 MB, rack8x8 all_reduce 64 MB. At these sizes the model hides dim1 latency for both systems (chunk overlap, see 5a) and dim0 is identical by construction, so nothing CAN differ. Do not cite them in either direction.
-  vs B2: Loom wins all 24 cells (+0.3...+73.1%).
-- Apps F2 (direct algorithms) (`apps_direct.csv`): gpt3_dense 32 ranks **+5.36%**; gpt3_dense 64 ranks **+5.01%**; mixtral_moe 16 ranks **+7.58%**; mixtral_moe 64 ranks **+15.27%** vs B1.
+  2 cells are EXACTLY identical (+0.000%), carrying no information rather than showing a win: 256gpu_32racks all_reduce 64 MB, 64gpu_8racks all_reduce 64 MB. At these sizes the model hides dim1 latency for both systems (chunk overlap, see 5a) and dim0 is identical by construction, so nothing CAN differ. Do not cite them in either direction.
+  vs B2: Loom wins all 24 cells (+0.1...+73.4%).
+- Apps F2 (direct algorithms) (`apps_direct.csv`): gpt3_dense 32 ranks **+5.07%**; gpt3_dense 64 ranks **+5.01%**; gpt3_dense 256 ranks **+2.38%**; mixtral_moe 16 ranks **+4.98%**; mixtral_moe 64 ranks **+15.27%**; mixtral_moe 256 ranks **+18.68%** vs B1.
 
   Gain decomposition (apps_direct.csv) - the compute column is
   SM reclamation, structurally capped at 15.2% (= 1 - 839/989, the 20/132
@@ -228,10 +230,12 @@ root = working rules. Result numbers are generated into section 5 by
 
 | app | ranks | exposed comm | comm gain | compute gain | wall gain |
 |---|---|---|---|---|---|
-| gpt3_dense | 32 | 80.4% | +3.2% | +14.3% | **+5.36%** |
+| gpt3_dense | 32 | 78.5% | +2.5% | +14.3% | **+5.07%** |
 | gpt3_dense | 64 | 88.3% | +3.8% | +14.1% | **+5.01%** |
-| mixtral_moe | 16 | 62.8% | +4.2% | +13.4% | **+7.58%** |
+| gpt3_dense | 256 | 95.8% | +2.0% | +11.4% | **+2.38%** |
+| mixtral_moe | 16 | 59.1% | -0.8% | +13.4% | **+4.98%** |
 | mixtral_moe | 64 | 82.3% | +15.7% | +13.2% | **+15.27%** |
+| mixtral_moe | 256 | 94.3% | +19.2% | +10.7% | **+18.68%** |
 
 <!-- END GENERATED RESULTS -->
 
@@ -341,13 +345,35 @@ EOS (576 nodes x 8 GPUs = 4,608), DeepEP at 64+ EP degree, NVIDIA Wide-EP
 on GB200 NVL72. At 64 GPUs we are ~1/70th of the smallest comparable
 setup, in the regime where the divide costs least.
 
-**OPEN (owner): raise the grid scale.** Recommend 8 XPUs/rack fixed, racks
-{8, 32} = 64 and 256 GPUs, so scale is an explicit axis and the regime
-dependence is shown rather than hidden. This moves every matrix and apps
-number. Counter-argument to address in prose either way: NVL72-class
-racks enlarge the scale-up domain and shrink cross-rack traffic - Loom's
-answer is that racks still must talk at cluster scale, which is exactly
-what the rack-count sweep shows.
+**DONE 2026-08-04: the grid is now 8 XPUs/rack fixed, racks {8, 32} =
+64 and 256 GPUs**, and every apps row uses 8 XPUs/rack too.
+
+| matrix, mean over 4 collectives | 1 MB | 16 MB | 64 MB |
+|---|---|---|---|
+| 64 GPUs / 8 racks | +30.52% | +12.02% | +2.00% |
+| 256 GPUs / 32 racks | +34.52% | +26.75% | **+13.44%** |
+
+`all_reduce` 64 MB, the cell that was a byte-identical tie: **+0.00% ->
++25.21%**. MoE apps improve with scale (mixtral +15.27% at 64 ranks ->
+**+18.68%** at 256, comm +19.2%).
+
+**Two numbers moved DOWN; both are corrections, not regressions:**
+- mixtral-16 was +7.47%, is now +4.98%. Its old shape was 4 racks x 4
+  XPUs; at the deployed 8 XPUs/rack a 16-GPU job fits in 2 racks, so
+  almost nothing crosses dim1. The old figure was inflated by a rack size
+  nobody builds.
+- gpt3_dense-256 is +2.38%, BELOW its own 64-rank +5.01%, and is NOT
+  directly comparable: pp cannot exceed the dense preset's `--num_stacks`
+  (4) or STG's `convert_chakra` asserts, so the 256 point scales data
+  parallelism instead (dp16 tp4 pp4). More DP means more bulk gradient
+  all_reduce - the bandwidth-bound regime where Loom is at parity by
+  design. Say this in the paper rather than letting a reader see a scaling
+  failure.
+
+Prose must still address the counter-trend: NVL72-class racks enlarge the
+scale-up domain and shrink cross-rack traffic. Loom's answer is that racks
+still must talk at cluster scale, which is what the rack-count sweep
+shows.
 
 **HOW THE all_reduce 64 MB CELL WENT FROM -0.31% TO +0.000% (2026-08-04).**
 It did not get better - it became a TIE, and the tie is forced. The

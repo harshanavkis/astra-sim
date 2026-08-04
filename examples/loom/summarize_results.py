@@ -82,8 +82,13 @@ def matrix_lines(csv_name="matrix.csv", label="Matrix"):
     if not rows:
         return []
     cells = collections.defaultdict(dict)
+    # tolerate an older CSV lying around with the pre-2026-08-04 column name
+    # rather than crashing the whole summary on one stale file
+    key = "cluster" if "cluster" in rows[0] else "topology"
+    if key not in rows[0]:
+        return [f"- {label} (`{csv_name}`): SKIPPED, unrecognised schema."]
     for r in rows:
-        cells[(r["cluster"], r["collective"], r["size_mb"])][r["system"]] = \
+        cells[(r[key], r["collective"], r["size_mb"])][r["system"]] = \
             int(r["wall_cycles"])
     per_size = collections.defaultdict(list)
     negatives = []
