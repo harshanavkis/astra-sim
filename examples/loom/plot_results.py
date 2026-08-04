@@ -153,6 +153,74 @@ def plot_matrix():
     save(fig, "matrix.pdf")
 
 
+def plot_p2p():
+    rows = read("p2p_sweep.csv")
+    if not rows:
+        return
+    data = {}
+    for r in rows:
+        data.setdefault(r["route"], {}).setdefault(r["system"], {})[
+            int(r["size_kb"])] = int(r["wall_cycles"])
+    routes = [r for r in ("in_rack", "cross_rack") if r in data]
+    colors = {"loom": "#70ad47", "b1_gpu_rdma": "#8db4e2",
+              "b2_cpu_proxy": "#c00000", "b3_ideal": "#808080"}
+    # left column: absolute cost vs size (log-log) - the fixed per-op offset
+    # at small sizes is the whole story. right column: gain over B1.
+    fig, axes = plt.subplots(len(routes), 2, figsize=(8, 3 * len(routes)),
+                             squeeze=False)
+    # dashed + varied width so exactly-superimposed curves stay readable:
+    # in-rack, Loom/B1/B3 are identical BY CONSTRUCTION (same dim0 config),
+    # and a reader must be able to see that rather than assume a missing line.
+    style = {"loom": (2.0, "-"), "b1_gpu_rdma": (1.2, "--"),
+             "b3_ideal": (1.0, ":"), "b2_cpu_proxy": (1.2, "-")}
+    for i, route in enumerate(routes):
+        ax = axes[i][0]
+        for sysname, series in sorted(data[route].items()):
+            sizes = sorted(series)
+            lw, ls = style.get(sysname, (1.2, "-"))
+            ax.plot([s / 1024 for s in sizes], [series[s] / 1e3 for s in sizes],
+                    marker="o", ms=3, lw=lw, ls=ls, label=sysname,
+                    color=colors.get(sysname))
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xlabel("transfer size (MB)")
+        ax.set_ylabel("kilocycles")
+        ax.set_title(f"{route}: cost vs size", fontsize=9)
+        if i == 0:
+            ax.legend(fontsize=7)
+
+        # gain against BOTH RDMA baselines. In-rack the B1 curve is flat zero
+        # by construction, so plotting it alone would present an assumption
+        # as a measurement; the B2 comparison is the real in-rack result.
+        ax = axes[i][1]
+        loom = data[route].get("loom")
+        identity = True
+        for base_name, label, colour in (("b1_gpu_rdma", "vs B1 (GPU RDMA)", "#70ad47"),
+                                         ("b2_cpu_proxy", "vs B2 (CPU proxy)", "#c00000")):
+            base = data[route].get(base_name)
+            if not (loom and base):
+                continue
+            sizes = sorted(set(loom) & set(base))
+            gains = [100 * (base[s] - loom[s]) / base[s] for s in sizes]
+            if max(abs(g) for g in gains) > 0.001:
+                identity = False
+            ax.plot([s / 1024 for s in sizes], gains, marker="o", ms=3,
+                    lw=1.2, label=label, color=colour)
+        ax.axhline(0, color="grey", lw=0.8)
+        ax.set_xscale("log")
+        ax.set_xlabel("transfer size (MB)")
+        ax.set_ylabel("Loom gain (%)")
+        ax.set_title(f"{route}: per-op cost vs size", fontsize=9)
+        ax.legend(fontsize=7)
+        if route == "in_rack":
+            ax.annotate("Loom = B1 = B3 by construction:\nidentical dim0 "
+                        "(the ToR IS the rack switch).\nNot a measurement — "
+                        "T3 supplies the\nempirical in-rack delta.",
+                        xy=(0.40, 0.55), xycoords="axes fraction", fontsize=6.5,
+                        color="#555555")
+    save(fig, "p2p.pdf")
+
+
 def plot_apps():
     rows = read("apps.csv")
     if not rows:
@@ -184,3 +252,4 @@ if __name__ == "__main__":
     plot_regime()
     plot_matrix()
     plot_apps()
+    plot_p2p()
