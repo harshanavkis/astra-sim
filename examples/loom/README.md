@@ -124,8 +124,21 @@ Three tiers, all Chakra ET format (the simulator sees no difference):
   uplinks. Identical physical rates on both (equal-wires framing; Loom also
   deletes M NICs per rack, so equal-cost would favor Loom - stated in prose,
   not modeled).
-- Loom ToR uplink aggregate defaults to the baseline's M NICs
-  (`--uplink-oversub 1.0`); oversubscription is an explicit sweep (S-6).
+- Loom ToR uplink aggregate = the baseline's M NICs (`--uplink-oversub
+  1.0`, equal wires). This is the modelled default and is NOT swept
+  (decision 2026-08-04). Rationale: 400 GB/s of uplink for a rack of 8 is
+  a small fraction of a modern ToR ASIC's capacity, so non-blocking is an
+  engineering choice rather than a stretch; thinning only Loom's uplinks
+  while the baseline keeps a dedicated NIC per GPU would compare unequal
+  wires; and under equal COST the argument runs the other way, because
+  Loom deletes M NICs per rack. If challenged, the answer is that sentence
+  plus `--uplink-oversub`, not a figure.
+- **Oversubscription is not the same as the dim0/dim1 taper.** Per XPU,
+  scale-up is 64 GB/s and scale-out 50 GB/s — PCIe5/NVLink-class vs
+  400GbE-class wire rates, paid by BOTH systems and not a provisioning
+  choice. Oversubscription is specifically the ToR's downlink:uplink
+  ratio, which exists only for Loom because only Loom routes cross-rack
+  traffic through a shared switch.
 - KNOWN GAP, generous to Loom: a Loom XPU's single fabric port carries both
   intra- and cross-rack traffic, but AstraSim's orthogonal dims let dim1
   traffic bypass dim0 capacity (which matches the baseline's separate NIC,
@@ -185,7 +198,7 @@ specific value should be pinned to a page/table before the paper cites it.
 
 ## Suite inventory (what runs, what it produces)
 
-`run_all.sh` = 4 experiments, **164 simulator invocations**, ~8–12 min in
+`run_all.sh` = 4 experiments, **116 simulator invocations**, ~6–9 min in
 Docker (matrix dominates). Each experiment writes one CSV to `results/`;
 `plot_results.py` renders one PDF per CSV (skips missing ones).
 
@@ -195,9 +208,9 @@ Docker (matrix dominates). Each experiment writes one CSV to `results/`;
 | sweep_credits | 8 (credits 1…64, 2^20=∞) | `sweep_credits.csv` (read_credits, wall_cycles) | `credits.pdf` log-log line | exact linear concurrency scaling; ∞ = uncapped design |
 | sweep_tpipe | 7 (6 t_pipe × Loom + B1) | `sweep_tpipe.csv` (system, t_pipe_ns, wall_cycles) | `tpipe.pdf` curve + B1 line | source-pipeline break-even |
 | regime_map | 12 (6 compute-speeds × 2) | `regime_map.csv` (compute_speedup, loom, b1, gain_pct, exposed_comm_pct) | `regime.pdf` gain curve + SM ceiling | where Loom wins: gain vs comm-boundedness |
-| matrix | 144 (3 scale/provisioning variants × 4 coll × 3 sizes × 4 sys; all `[Switch, Switch]`) | `matrix.csv` (topology, collective, size_mb, system, wall, exposed) | `matrix.pdf` gain grid, one row per size | traffic patterns × topologies coverage |
+| matrix | 96 (2 scales × 4 coll × 3 sizes × 4 sys; all `[Switch, Switch]`) | `matrix.csv` (topology, collective, size_mb, system, wall, exposed) | `matrix.pdf` gain grid, one row per size | scale × collective × size coverage (16 and 64 XPUs) |
 | apps | 8 (4 configs × Loom/B1) | `apps.csv` (app, ranks, system, wall, exposed) | `apps.pdf` gain bars | Mixtral MoE + GPT-3 at two scales (published shapes) |
-| *(F2, answered)* run_f2.sh | 152 (matrix+apps under `direct`) | `matrix_direct.csv`, `apps_direct.csv` | — | ring-vs-direct control; on the deployed topology the two agree to 0.02%, so the question is moot |
+| *(F2, answered)* run_f2.sh | 104 (matrix+apps under `direct`) | `matrix_direct.csv`, `apps_direct.csv` | — | ring-vs-direct control; on the deployed topology the two agree to 0.02%, so the question is moot |
 | *(optional)* victim | 3 (solo/voq/shared_fifo) | `victim.csv` (case, victim_fct_cycles) | `victim.pdf` bars | standalone demo only; not in run_all |
 
 > **No result numbers in this file.** They live in CHECKPOINT.md section 5,

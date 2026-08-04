@@ -169,10 +169,10 @@ root = working rules. Result numbers are generated into section 5 by
 - Break-even t_pipe (`sweep_tpipe.csv`) — STANDALONE, not in the default suite (optional reviewer-proofing; T3 will measure t_pipe): **3596 ns** (linear, 480 cycles/ns). Its durable use is showing the design tolerates a slow FPGA clock.
 - Regime map (`regime_map.csv`) — STANDALONE, not in the default suite; runs `--pipe-ns 500` so its Loom is NOT the Loom of the other experiments (see 5a.5). Rerun it before quoting:
   **13.9%** at 12% exposed comm -> **3.3%** at 91%. No negative point.
-- Matrix (`matrix.csv`, 36 Loom-vs-B1 cells): +2.8...+39.5% @1 MB, +0.1...+22.8% @16 MB, -0.3...+6.1% @64 MB.
-  3 negative cells (1x all_gather, 2x all_reduce); worst **-0.31%** (rack8x8 all_reduce 64 MB).
-  vs B2: Loom wins all 36 cells (+0.2...+72.7%).
-  vs B3: +0.2...+104.7% off B3 across all 36 cells.
+- Matrix (`matrix.csv`, 24 Loom-vs-B1 cells): +3.4...+39.5% @1 MB, +0.2...+22.8% @16 MB, -0.3...+4.1% @64 MB.
+  2 negative cells (2x all_reduce); worst **-0.31%** (rack8x8 all_reduce 64 MB).
+  vs B2: Loom wins all 24 cells (+0.3...+72.7%).
+  vs B3: +0.2...+104.7% off B3 across all 24 cells.
 - Apps (`apps.csv`): gpt3_dense 32 ranks **+5.25%**; gpt3_dense 64 ranks **+4.97%**; mixtral_moe 16 ranks **+7.47%**; mixtral_moe 64 ranks **+15.01%** vs B1.
 
   Gain decomposition (apps.csv) - the compute column is
@@ -188,10 +188,10 @@ root = working rules. Result numbers are generated into section 5 by
 | mixtral_moe | 64 | 82.3% | +15.4% | +13.2% | **+15.01%** |
 
 
-- Matrix F2 (direct algorithms) (`matrix_direct.csv`, 36 Loom-vs-B1 cells): +2.8...+39.4% @1 MB, +0.1...+22.8% @16 MB, -0.3...+6.1% @64 MB.
-  3 negative cells (1x all_gather, 2x all_reduce); worst **-0.31%** (rack8x8 all_reduce 64 MB).
-  vs B2: Loom wins all 36 cells (+0.2...+72.6%).
-  vs B3: +0.2...+105.0% off B3 across all 36 cells.
+- Matrix F2 (direct algorithms) (`matrix_direct.csv`, 24 Loom-vs-B1 cells): +3.4...+39.4% @1 MB, +0.2...+22.8% @16 MB, -0.3...+4.1% @64 MB.
+  2 negative cells (2x all_reduce); worst **-0.31%** (rack8x8 all_reduce 64 MB).
+  vs B2: Loom wins all 24 cells (+0.3...+72.6%).
+  vs B3: +0.2...+105.0% off B3 across all 24 cells.
 - Apps F2 (direct algorithms) (`apps_direct.csv`): gpt3_dense 32 ranks **+5.25%**; gpt3_dense 64 ranks **+4.97%**; mixtral_moe 16 ranks **+7.47%**; mixtral_moe 64 ranks **+15.01%** vs B1.
 
   Gain decomposition (apps_direct.csv) - the compute column is
@@ -210,14 +210,25 @@ root = working rules. Result numbers are generated into section 5 by
 
 ## 5a. Phase-A findings (2026-08-04) — read before interpreting section 5
 
-**ONE PHYSICAL TOPOLOGY (owner decision 2026-08-04).** Every experiment now
-runs `[Switch, Switch]`, because that is what is actually deployed:
-scale-up is a switch (NVSwitch/NVLink), scale-out is a switched
-Clos/rail-optimized fabric. The matrix variants change SCALE (4x4, 8x8) and
-PROVISIONING (oversubscribed uplinks), never the physical topology. The
-`ring_tor` row (`--dim1-topology Ring`) is deleted - nobody deploys a ring
-of ToRs, and it was the sole source of the "negative cells" confusion.
-`--dim1-topology` survives as a generator knob but is not exercised.
+**ONE PHYSICAL TOPOLOGY, ONE PROVISIONING (owner decisions 2026-08-04).**
+Every experiment runs `[Switch, Switch]` at equal wires. That is what is
+deployed: scale-up is a switch (NVSwitch/NVLink), scale-out is a switched
+Clos/rail-optimized fabric. The matrix grid is now **SCALE x COLLECTIVE x
+SIZE** - 2 scales (16 and 64 XPUs), nothing else. Two rows were deleted:
+- `ring_tor` (`--dim1-topology Ring`): nobody deploys a ring of ToRs, and
+  it was the sole source of the "negative cells" confusion. The knob
+  survives in the generator but is not exercised.
+- `thin_uplinks` (`--net-bw 12.5`): misnamed and answered the wrong
+  question - `--net-bw` thins the fabric for BOTH systems, modelling a
+  slower network for everyone rather than thin LOOM uplinks. The
+  Loom-specific knob is `--uplink-oversub`, deliberately pinned at 1.0
+  (equal wires: ToR uplink aggregate = the M NICs Loom deletes) and NOT
+  swept: 400 GB/s of uplink is a small fraction of a modern ToR ASIC, so
+  non-blocking is an engineering choice; handicapping only Loom would
+  break the equal-wires framing; and under equal COST the argument runs
+  the other way, since Loom removes M NICs per rack.
+  **Do not confuse this with the dim0/dim1 taper** (64 vs 50 GB/s per
+  XPU): those are wire rates, paid by both systems, not provisioning.
 
 **This also makes F2 moot, which is the cleanest possible outcome.** With
 the ring topology gone, the ring and direct algorithms agree to within

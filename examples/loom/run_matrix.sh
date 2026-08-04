@@ -18,20 +18,30 @@ SIZES=${SIZES:-1 16 64}
 SUFFIX=${SUFFIX:-}
 # name racks xpus extra-args
 #
-# ONE physical topology everywhere: [Switch, Switch]. That is what real
-# deployments are - scale-up is a switch (NVSwitch/NVLink), scale-out is a
-# switched Clos/rail-optimized fabric. The variants below change SCALE
-# (4x4 vs 8x8) and PROVISIONING (oversubscribed uplinks), never the
-# physical topology.
+# The grid is SCALE x COLLECTIVE x SIZE. There is exactly ONE physical
+# topology, [Switch, Switch], because that is what is deployed: scale-up is
+# a switch (NVSwitch/NVLink), scale-out is a switched Clos/rail-optimized
+# fabric. Two rows = 16 and 64 XPUs.
 #
-# A `ring_tor` row (--dim1-topology Ring) was removed on 2026-08-04: no one
-# deploys a ring of ToRs, and it was the sole source of the confusing
-# "negative cells" story. A ring algorithm on a ring topology made that
-# collective ~5x slower for BOTH systems, diluting Loom's per-op advantage
-# until only its 50 ns in-rack lookup showed - reading as -1.11%. With the
-# ring topology gone, ring and direct algorithms agree to within 0.02%
-# (mean +13.02% vs +13.00%), i.e. the F2 question is moot by construction.
-TOPOS=("rack4x4 4 4" "rack8x8 8 8" "thin_uplinks 8 8 --net-bw 12.5")
+# Removed on 2026-08-04:
+#  - `ring_tor` (--dim1-topology Ring): nobody deploys a ring of ToRs, and
+#    it was the sole source of the "negative cells" confusion. A ring
+#    ALGORITHM on a ring TOPOLOGY made that collective ~5x slower for BOTH
+#    systems, diluting Loom's per-op advantage until only its 50 ns in-rack
+#    lookup showed (-1.11%). Without it, ring and direct agree to within
+#    0.02%, so the F2 question is moot by construction.
+#  - `thin_uplinks` (--net-bw 12.5): misnamed, and it answered the wrong
+#    question. --net-bw thins the fabric for BOTH systems, so it modelled a
+#    slower network for everyone, not thin LOOM uplinks. The Loom-specific
+#    knob is --uplink-oversub, deliberately left at 1.0 = equal wires (ToR
+#    uplink aggregate = the M NICs Loom deletes). That is buildable (400
+#    GB/s of uplink is a small fraction of a modern ToR ASIC), and
+#    handicapping only Loom would break the equal-wires fairness framing -
+#    under equal COST the argument runs the other way, since Loom removes M
+#    NICs per rack. NOTE: the intrinsic dim0/dim1 taper (64 vs 50 GB/s per
+#    XPU) is NOT oversubscription - those are the wire rates, and both
+#    systems pay them.
+TOPOS=("rack4x4 4 4" "rack8x8 8 8")
 
 echo "topology,collective,size_mb,system,wall_cycles,exposed_comm"
 for T in "${TOPOS[@]}"; do
