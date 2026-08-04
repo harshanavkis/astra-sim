@@ -15,7 +15,18 @@ mkdir -p $RES
 # victim (VOQ vs shared-FIFO) is NOT part of the standard suite: the paper
 # makes no congestion-isolation claim (moved to Discussion, 2026-07-08).
 # Run examples/loom/run_victim.sh standalone if the discussion is challenged.
-for EXP in smoke sweep_credits sweep_tpipe regime_map matrix apps; do
+# sweep_tpipe and regime_map are NOT in the default suite (owner sweep
+# policy 2026-07-27: FPGA-owned constants are measured, not swept; the
+# suite used to contradict it by running both every time):
+#   - sweep_tpipe is optional reviewer-proofing, and T3 will MEASURE
+#     t_pipe, retiring it. Run it standalone when the "design tolerates a
+#     slow FPGA clock" figure is wanted.
+#   - regime_map scales compute artificially and runs --pipe-ns 500, so its
+#     Loom is not the Loom of every other experiment. The apps
+#     comm/compute decomposition in CHECKPOINT section 5 shows the same
+#     thing on real published workloads, for free.
+# Both scripts still work standalone.
+for EXP in smoke sweep_credits matrix apps; do
     SCRIPT=examples/loom/run_${EXP}.sh
     echo ">>> $EXP"
     $SCRIPT > $RES/$EXP.csv

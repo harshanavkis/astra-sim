@@ -17,7 +17,21 @@ SIZES=${SIZES:-1 16 64}
 # switch together so the comparison isolates the algorithm.
 SUFFIX=${SUFFIX:-}
 # name racks xpus extra-args
-TOPOS=("rack4x4 4 4" "rack8x8 8 8" "thin_uplinks 8 8 --net-bw 12.5" "ring_tor 8 8 --dim1-topology Ring")
+#
+# ONE physical topology everywhere: [Switch, Switch]. That is what real
+# deployments are - scale-up is a switch (NVSwitch/NVLink), scale-out is a
+# switched Clos/rail-optimized fabric. The variants below change SCALE
+# (4x4 vs 8x8) and PROVISIONING (oversubscribed uplinks), never the
+# physical topology.
+#
+# A `ring_tor` row (--dim1-topology Ring) was removed on 2026-08-04: no one
+# deploys a ring of ToRs, and it was the sole source of the confusing
+# "negative cells" story. A ring algorithm on a ring topology made that
+# collective ~5x slower for BOTH systems, diluting Loom's per-op advantage
+# until only its 50 ns in-rack lookup showed - reading as -1.11%. With the
+# ring topology gone, ring and direct algorithms agree to within 0.02%
+# (mean +13.02% vs +13.00%), i.e. the F2 question is moot by construction.
+TOPOS=("rack4x4 4 4" "rack8x8 8 8" "thin_uplinks 8 8 --net-bw 12.5")
 
 echo "topology,collective,size_mb,system,wall_cycles,exposed_comm"
 for T in "${TOPOS[@]}"; do

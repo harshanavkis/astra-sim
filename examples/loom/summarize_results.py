@@ -49,15 +49,32 @@ def apps_lines(csv_name="apps.csv", label="Apps"):
     rows = read(csv_name)
     if not rows:
         return []
-    d = {(r["app"], r["ranks"], r["system"]): int(r["wall_cycles"]) for r in rows}
+    d = {(r["app"], r["ranks"], r["system"]): (int(r["wall_cycles"]),
+                                               int(r["exposed_comm"])) for r in rows}
     apps = sorted({(r["app"], int(r["ranks"])) for r in rows})
-    parts = []
+    parts, table = [], []
     for app, ranks in apps:
         key = (app, str(ranks))
-        if (*key, "loom") in d and (*key, "b1_gpu_rdma") in d:
-            g = gain(d[(*key, "b1_gpu_rdma")], d[(*key, "loom")])
-            parts.append(f"{app} {ranks} ranks **{g:+.2f}%**")
-    return [f"- {label} (`{csv_name}`): " + "; ".join(parts) + " vs B1."]
+        if (*key, "loom") not in d or (*key, "b1_gpu_rdma") not in d:
+            continue
+        lw, le = d[(*key, "loom")]
+        bw, be = d[(*key, "b1_gpu_rdma")]
+        g = gain(bw, lw)
+        parts.append(f"{app} {ranks} ranks **{g:+.2f}%**")
+        # split the gain: communication time vs (wall - comm) compute time
+        table.append(f"| {app} | {ranks} | {100*be/bw:.1f}% | "
+                     f"{gain(be, le):+.1f}% | {gain(bw-be, lw-le):+.1f}% | "
+                     f"**{g:+.2f}%** |")
+    out = [f"- {label} (`{csv_name}`): " + "; ".join(parts) + " vs B1."]
+    if table:
+        out += ["", f"  Gain decomposition ({csv_name}) - the compute column is",
+                "  SM reclamation, structurally capped at "
+                f"{100*(1-839/989):.1f}% (= 1 - 839/989, the 20/132",
+                "  SM reservation); the comm column is per-operation initiation,",
+                "  which amortizes away on large messages:", "",
+                "| app | ranks | exposed comm | comm gain | compute gain | wall gain |",
+                "|---|---|---|---|---|---|"] + table + [""]
+    return out
 
 
 def matrix_lines(csv_name="matrix.csv", label="Matrix"):
@@ -113,7 +130,10 @@ def regime_lines():
         return []
     lo, hi = rows[0], rows[-1]
     neg = [r for r in rows if float(r["gain_pct"]) < 0]
-    return [f"- Regime map (`regime_map.csv`): **{lo['gain_pct']}%** at "
+    return ["- Regime map (`regime_map.csv`) — STANDALONE, not in the default "
+            "suite; runs `--pipe-ns 500` so its Loom is NOT the Loom of the "
+            "other experiments (see 5a.5). Rerun it before quoting:",
+            f"  **{lo['gain_pct']}%** at "
             f"{lo['loom_exposed_comm_pct']}% exposed comm -> "
             f"**{hi['gain_pct']}%** at {hi['loom_exposed_comm_pct']}%. "
             f"{'No negative point.' if not neg else str(len(neg)) + ' negative points.'}"]
@@ -139,8 +159,11 @@ def tpipe_lines():
     if breakeven is None:
         return [f"- Break-even t_pipe (`sweep_tpipe.csv`): outside the swept "
                 f"range {loom[0][0]:.0f}-{loom[-1][0]:.0f} ns."]
-    return [f"- Break-even t_pipe (`sweep_tpipe.csv`): **{breakeven:.0f} ns** "
-            f"(linear, {slope:.0f} cycles/ns)."]
+    return [f"- Break-even t_pipe (`sweep_tpipe.csv`) — STANDALONE, not in the "
+            f"default suite (optional reviewer-proofing; T3 will measure "
+            f"t_pipe): **{breakeven:.0f} ns** (linear, {slope:.0f} cycles/ns). "
+            f"Its durable use is showing the design tolerates a slow FPGA "
+            f"clock."]
 
 
 def credits_lines():

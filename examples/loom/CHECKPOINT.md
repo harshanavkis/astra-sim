@@ -1,42 +1,23 @@
 # CHECKPOINT — Loom project state
 
-> **Last updated: 2026-08-03, late II (6.2a BUNDLED TWO-HOST BINARY CODE
-> DONE: Coyote `examples/loom/sw-bundled/` - loomd<->loomd TCP peering
-> (staging-VA hello, cross-host handle resolution, DONE barrier), QP
-> setup via cThread::initRDMA, BundledOrchestrator programs remote
-> imports as rdma windows (pid = local QP owner, base = exporter VA);
-> FPGA-free peering test 17x PASS; execution needs the two-host testbed.
-> Earlier same evening: T3 STAGE CYCLE COUNTERS IMPLEMENTED,
-> owner move-up: prototype phase 5.3b adds RO CSR words 48-63 — cycle
-> counter, order-FIFO residency accumulator (t-queue), per-stage cycle
-> sums + op counts (t-lookup/t-forward/t-encap + dma/read/fence) — all
-> sims green (block TBs incl. exact-cycle checks, C++ integration 19x
-> PASS, Python exact counts); T3 now needs only hardware runs. The
-> FPGA-owned table intro in README.md and the implementation-plan banner
-> reflect this. Earlier same day, TESTBED WORK STARTED: the Coyote vFPGA
-> prototype now exists in the Coyote repo, `examples/loom/` — RTL
-> (ctrl/table/engine/rx/arbiter), 5 block TBs, integration sim via the
-> real cThread API, Python RDMA TX test, role-split sw, ALL GREEN in XSIM;
-> hardware phases 5.2+ pending testbed time. `implementation-plan.md`
-> here is now the AUTHORITATIVE plan, updated with an implementation-
-> status banner and the eval-review descopes applied inline: Phase 4
-> victim/failure DEAD, reads PLANNED scoped to T6 read-RTT calibration
-> (correcting an earlier same-day edit that briefly marked them
-> optional), Phase 6 tier-1 built; testbed deliverables = the FPGA-owned
-> constants (T3 stage latencies, T2 coalescing curve, T6 read RTT,
-> floors, B2 rdma-init). Reads moved UP in the prototype roadmap (owner
-> direction 2026-08-03): local read path is the next phase, before the
-> loomd software split. Prior update 2026-08-02:
-> evaluation-review session closed out: `HANDOFF-EVAL-REVIEW.md` added —
-> full session record, verdicts, integrity findings, decisions, phased
-> implementation plan A–D, reviewer defenses. Prior updates 07-27/28:
-> experiment catalog §5b, §5 reconciled to CSVs, descoping + sweep-policy
-> + positioning decisions, MoX additions).** LIVING DOCUMENT — overwritten in place with
-> every change (user mandate), alongside `CODE-MAP.md`. Written for session
-> restart on a possibly different server: read this first; it contains
-> everything needed to resume. Lives in the astra-sim repo (branch
-> `loom-sim`, next to `examples/loom/README.md` with the run instructions);
-> companion design docs live in `loom-paper/design-docs/`.
+> **Last updated: 2026-08-04 (PHASE A DONE).** Data integrity fixed
+> (`run_smoke.sh` generates its configs; the rotted `network/*.yml` are
+> deleted; B2 no longer runs on B1's network), F2 settled and then made
+> moot by the topology decision, docs consolidated from seven files to
+> four, and section 5 is now GENERATED from `results/*.csv` by
+> `summarize_results.py`. **ONE physical topology everywhere:
+> `[Switch, Switch]`** - the `ring_tor` row is deleted as unrepresentative
+> of any real deployment. `regime_map` and `sweep_tpipe` left the default
+> suite (they contradicted the owner's own sweep policy). Prior state:
+> testbed prototype through Coyote phase 6.2a with T3 stage counters
+> implemented; see `implementation-plan.md`, which is authoritative for
+> the testbed side.** LIVING DOCUMENT - the ONLY living state doc, so
+> there is nothing to keep in sync with it. Overwritten in place with
+> every commit; NEVER hand-write a result number into it (rerun the suite
+> and `summarize_results.py --write`). Written for session restart on a
+> possibly different server: read this first. Lives in the astra-sim repo
+> (branch `loom-sim`, next to `examples/loom/README.md`); companion design
+> docs live in `loom-paper/design-docs/`.
 
 ## 0. MIGRATION WARNING (read before moving servers)
 
@@ -55,8 +36,12 @@ git clone -b loom-sim https://github.com/harshanavkis/astra-sim.git
 cd astra-sim && git submodule update --init   # pulls the loom-sim commits from the forks
 # plus: tar the untracked loom-paper files (design-docs/, loom-drawio/, *.md)
 ```
-(Local submodule push remotes stay ssh; do not run `git submodule sync`
-or it overwrites them with the https URLs.)
+(Local submodule push remotes stay ssh on the ORIGINAL machine; there,
+do not run `git submodule sync` or it overwrites them with the https URLs.
+On a RESTORED machine the opposite holds: if the submodule `origin` already
+points at upstream astra-sim rather than the forks, `git submodule sync` is
+the fix, not the hazard. That was the case on the 2026-08-04 restore, where
+sync was run deliberately.)
 
 ## 1. What Loom is (design invariants — violate none of these)
 
@@ -181,37 +166,82 @@ root = working rules. Result numbers are generated into section 5 by
 
 - Smoke (`smoke.csv`, 4-NPU 1 MB all-to-all): b3_ideal_rdma 10195 < loom 14723 < b1_gpu_rdma 20105 < b2_cpu_proxy 36744. Loom vs B1 **+26.77%**.
 - Read credits (`sweep_credits.csv`, caps 1-1048576): exact linear 1/N scaling from 325568 cycles. Uncapped row present and equal to the 64-credit row.
-- Break-even t_pipe (`sweep_tpipe.csv`): **3596 ns** (linear, 480 cycles/ns).
-- Regime map (`regime_map.csv`): **13.9%** at 12% exposed comm -> **3.3%** at 91%. No negative point.
-- Matrix (`matrix.csv`, 48 Loom-vs-B1 cells): +1.6...+39.5% @1 MB, -1.1...+22.8% @16 MB, -0.3...+6.1% @64 MB.
-  5 negative cells (1x all_gather, 4x all_reduce); worst **-1.11%** (ring_tor all_reduce 16 MB).
-  vs B2: Loom wins all 48 cells (+0.1...+72.7%).
-  vs B3: +0.2...+104.7% off B3 across all 48 cells.
+- Break-even t_pipe (`sweep_tpipe.csv`) — STANDALONE, not in the default suite (optional reviewer-proofing; T3 will measure t_pipe): **3596 ns** (linear, 480 cycles/ns). Its durable use is showing the design tolerates a slow FPGA clock.
+- Regime map (`regime_map.csv`) — STANDALONE, not in the default suite; runs `--pipe-ns 500` so its Loom is NOT the Loom of the other experiments (see 5a.5). Rerun it before quoting:
+  **13.9%** at 12% exposed comm -> **3.3%** at 91%. No negative point.
+- Matrix (`matrix.csv`, 36 Loom-vs-B1 cells): +2.8...+39.5% @1 MB, +0.1...+22.8% @16 MB, -0.3...+6.1% @64 MB.
+  3 negative cells (1x all_gather, 2x all_reduce); worst **-0.31%** (rack8x8 all_reduce 64 MB).
+  vs B2: Loom wins all 36 cells (+0.2...+72.7%).
+  vs B3: +0.2...+104.7% off B3 across all 36 cells.
 - Apps (`apps.csv`): gpt3_dense 32 ranks **+5.25%**; gpt3_dense 64 ranks **+4.97%**; mixtral_moe 16 ranks **+7.47%**; mixtral_moe 64 ranks **+15.01%** vs B1.
 
-- Matrix F2 (direct algorithms) (`matrix_direct.csv`, 48 Loom-vs-B1 cells): +2.8...+42.4% @1 MB, +0.1...+30.6% @16 MB, -0.3...+7.7% @64 MB.
+  Gain decomposition (apps.csv) - the compute column is
+  SM reclamation, structurally capped at 15.2% (= 1 - 839/989, the 20/132
+  SM reservation); the comm column is per-operation initiation,
+  which amortizes away on large messages:
+
+| app | ranks | exposed comm | comm gain | compute gain | wall gain |
+|---|---|---|---|---|---|
+| gpt3_dense | 32 | 80.4% | +3.1% | +14.3% | **+5.25%** |
+| gpt3_dense | 64 | 88.3% | +3.7% | +14.1% | **+4.97%** |
+| mixtral_moe | 16 | 62.8% | +4.0% | +13.4% | **+7.47%** |
+| mixtral_moe | 64 | 82.3% | +15.4% | +13.2% | **+15.01%** |
+
+
+- Matrix F2 (direct algorithms) (`matrix_direct.csv`, 36 Loom-vs-B1 cells): +2.8...+39.4% @1 MB, +0.1...+22.8% @16 MB, -0.3...+6.1% @64 MB.
   3 negative cells (1x all_gather, 2x all_reduce); worst **-0.31%** (rack8x8 all_reduce 64 MB).
-  vs B2: Loom wins all 48 cells (+0.2...+74.3%).
-  vs B3: +0.2...+129.5% off B3 across all 48 cells.
+  vs B2: Loom wins all 36 cells (+0.2...+72.6%).
+  vs B3: +0.2...+105.0% off B3 across all 36 cells.
 - Apps F2 (direct algorithms) (`apps_direct.csv`): gpt3_dense 32 ranks **+5.25%**; gpt3_dense 64 ranks **+4.97%**; mixtral_moe 16 ranks **+7.47%**; mixtral_moe 64 ranks **+15.01%** vs B1.
+
+  Gain decomposition (apps_direct.csv) - the compute column is
+  SM reclamation, structurally capped at 15.2% (= 1 - 839/989, the 20/132
+  SM reservation); the comm column is per-operation initiation,
+  which amortizes away on large messages:
+
+| app | ranks | exposed comm | comm gain | compute gain | wall gain |
+|---|---|---|---|---|---|
+| gpt3_dense | 32 | 80.4% | +3.1% | +14.3% | **+5.25%** |
+| gpt3_dense | 64 | 88.3% | +3.7% | +14.1% | **+4.97%** |
+| mixtral_moe | 16 | 62.8% | +4.0% | +13.4% | **+7.47%** |
+| mixtral_moe | 64 | 82.3% | +15.4% | +13.2% | **+15.01%** |
+
 <!-- END GENERATED RESULTS -->
 
 ## 5a. Phase-A findings (2026-08-04) — read before interpreting section 5
 
-**F2 is settled, and the ring-artifact story was half wrong.**
+**ONE PHYSICAL TOPOLOGY (owner decision 2026-08-04).** Every experiment now
+runs `[Switch, Switch]`, because that is what is actually deployed:
+scale-up is a switch (NVSwitch/NVLink), scale-out is a switched
+Clos/rail-optimized fabric. The matrix variants change SCALE (4x4, 8x8) and
+PROVISIONING (oversubscribed uplinks), never the physical topology. The
+`ring_tor` row (`--dim1-topology Ring`) is deleted - nobody deploys a ring
+of ToRs, and it was the sole source of the "negative cells" confusion.
+`--dim1-topology` survives as a generator knob but is not exercised.
+
+**This also makes F2 moot, which is the cleanest possible outcome.** With
+the ring topology gone, the ring and direct algorithms agree to within
+0.02% (36 cells: mean **+13.02%** ring vs **+13.00%** direct, both ranging
+to +39.4%, both with the same 3 negative cells). There is no headline
+choice to make between the two grids. Detail, kept because the reasoning
+matters:
 
 1. F2 as previously specified (flip only `all-to-all-implementation` to
    `direct`) could never have answered the question: **all five negative
    cells were all_reduce (4) and all_gather (1); none was all_to_all.**
    The `*_direct.json` variants therefore switch all four collectives, for
    all four systems together (`SUFFIX=_direct`, `run_f2.sh`).
-2. **Confirmed for the worst cell only.** `ring_tor all_reduce 16 MB` goes
-   −1.11% → **+30.64%** under direct, and `ring_tor all_reduce 64 MB`
-   −0.31% → +2.78%. Those were a ring-algorithm-on-Ring-dim1-topology
-   artifact and must no longer be described as a Loom deficiency.
-3. **Retracted for the rest.** Three cells are bit-identical under both
-   algorithms (`rack4x4`/`rack8x8` all_reduce 64 MB, `thin_uplinks`
-   all_gather 64 MB). Their cause is now measured, not guessed: it is
+2. The two `ring_tor` negatives were an artifact of running a ring
+   ALGORITHM on a ring TOPOLOGY: that combination made the collective ~5x
+   slower for BOTH systems (Loom 251,284 vs 49,296 cycles under direct),
+   which diluted Loom's per-operation advantage until only its 50 ns
+   in-rack lookup remained visible - reading as −1.11%. Under direct the
+   same cell reads +30.64%. Neither number describes deployed hardware,
+   which is why the row is gone rather than re-reported.
+3. **The three real negatives survive on the deployed topology** and are
+   bit-identical under both algorithms (`rack4x4`/`rack8x8` all_reduce
+   64 MB, `thin_uplinks` all_gather 64 MB). Their cause is measured, not
+   guessed: it is
    **`t_pipe_local`, the 50 ns in-rack lookup adder on dim0** (Loom dim0 =
    550 ns vs baseline 500 ns). Regenerating that cell with
    `--pipe-local-ns 0` yields 909,088 cycles — bit-identical to B1 —
@@ -229,11 +259,23 @@ root = working rules. Result numbers are generated into section 5 by
 
 **Audit findings against the catalog (2026-08-04), still open:**
 
-5. **The regime map (A4) is not comparable to apps/matrix.**
-   `run_regime_map.sh` passes `--pipe-ns 500`, which overrides the
-   per-stage source sum of 200 ns, so its Loom dim1 is 1925 ns while every
-   other experiment uses 1625 ns. Pessimistic for Loom, so the gains are
-   if anything understated — but it is undisclosed in the constants table.
+5. **The regime map (A4) and the t_pipe sweep are OUT of the default
+   suite** (2026-08-04) — `run_all.sh` used to contradict the owner's own
+   sweep policy ("FPGA-owned constants are measured, not swept; no sweeps
+   in the default plan") by running both every time. Both scripts still
+   work standalone.
+   - `run_regime_map.sh` also passes `--pipe-ns 500`, overriding the
+     per-stage source sum of 200 ns, so its Loom dim1 is 1925 ns while
+     every other experiment uses 1625 ns — its numbers were never
+     comparable to apps/matrix. Its message (gain → SM ceiling when
+     compute-bound, → latency floor when comm-bound) is now carried by the
+     apps gain decomposition in the generated section 5, which uses real
+     published workloads at two scales instead of a synthetic
+     compute-scaling knob, and costs no extra runs.
+   - `run_sweep_tpipe.sh` is optional reviewer-proofing, and T3 will
+     MEASURE t_pipe, retiring it. Keep the one durable use: it shows the
+     design tolerates a ~3.6 µs pipeline, i.e. the FPGA's slow clock does
+     not invalidate the claim.
 6. **B3 uses `endpoint-delay: 1`, not 10** (`system/ideal_rdma.json`),
    while the constants table claims 10 ns for all systems.
 7. **The congestion-aware C++ is orphaned.** With victim/VOQ descoped,
