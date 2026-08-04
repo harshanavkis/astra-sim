@@ -259,6 +259,8 @@ def plot_scale():
                 label=f"{coll} {size} MB")
     ax.axhline(0, color="grey", lw=0.8)
     ax.set_xscale("log", base=2)
+    ax.set_xticks(gpus, [str(g) for g in gpus])  # actual GPU counts, not 2^n
+    ax.minorticks_off()
     ax.set_xlabel("cluster size (GPUs, 8 per rack)")
     ax.set_ylabel("Loom gain over B1 (%)")
     ax.set_title("Benefit grows with cluster width", fontsize=9)
