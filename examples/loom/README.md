@@ -72,7 +72,10 @@ examples/loom/
 │                              comm-boundedness. Superseded for most uses
 │                              by the apps decomposition in CHECKPOINT 5
 ├── run_matrix.sh              collectives x sizes x topologies x systems
-├── run_apps.sh                Mixtral MoE + GPT-3 dense at two scales
+├── run_scale_sweep.sh         A5: 8 XPUs/rack fixed, rack count swept
+│                              16-512 GPUs. THE headline sensitivity -
+│                              Loom's benefit is a function of cluster width
+├── run_apps.sh                Mixtral MoE + GPT-3 dense at three scales
 ├── run_f2.sh                  F2 control: matrix+apps under direct algorithms
 │                              (SUFFIX=_direct selects system/*_direct.json)
 ├── run_all.sh                 whole suite -> results/*.csv (in Docker)
@@ -200,7 +203,7 @@ specific value should be pinned to a page/table before the paper cites it.
 
 ## Suite inventory (what runs, what it produces)
 
-`run_all.sh` = 5 experiments, **151 simulator invocations**, ~6–10 min in
+`run_all.sh` = 6 experiments, **223 simulator invocations**, ~10–15 min in
 Docker (matrix dominates). Each experiment writes one CSV to `results/`;
 `plot_results.py` renders one PDF per CSV (skips missing ones).
 

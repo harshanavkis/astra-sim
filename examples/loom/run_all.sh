@@ -26,7 +26,7 @@ mkdir -p $RES
 #     comm/compute decomposition in CHECKPOINT section 5 shows the same
 #     thing on real published workloads, for free.
 # Both scripts still work standalone.
-for EXP in smoke p2p_sweep sweep_credits matrix apps; do
+for EXP in smoke p2p_sweep sweep_credits scale_sweep matrix apps; do
     SCRIPT=examples/loom/run_${EXP}.sh
     echo ">>> $EXP"
     $SCRIPT > $RES/$EXP.csv

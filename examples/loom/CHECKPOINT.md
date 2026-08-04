@@ -193,6 +193,19 @@ root = working rules. Result numbers are generated into section 5 by
   Cross-rack crossover: Loom leads B1 up to 1024 MB, then converges.
 
 - Read credits (`sweep_credits.csv`, caps 1-1048576): exact linear 1/N scaling from 325568 cycles. Uncapped row present and equal to the 64-credit row.
+- Scale sweep (`scale_sweep.csv`, A5) - 8 XPUs/rack fixed, RACK COUNT is the axis. Loom's benefit is a function of cluster width, so no single number is meaningful without stating the scale:
+
+| GPUs | all_reduce 1 MB | all_reduce 64 MB | all_to_all 1 MB | all_to_all 64 MB |
+|---|---|---|---|---|
+| 16 | +9.39% | +0.00% | +3.02% | +0.14% |
+| 32 | +34.95% | +0.00% | +14.54% | +0.72% |
+| 64 | +40.48% | +0.00% | +37.46% | +4.40% |
+| 128 | +43.28% | +6.55% | +42.59% | +9.16% |
+| 256 | +44.68% | +25.21% | +44.59% | +16.12% |
+| 512 | +45.38% | +32.71% | +45.41% | +24.37% |
+
+  Mechanism: a hierarchical collective spreads a roughly constant dim1 byte count over 2(r-1) steps, so per-step bytes fall as ~1/r while per-step LATENCY is fixed. Few racks = few fat steps = bandwidth-bound, hiding Loom's 1615-vs-3000 ns dim1 edge; many racks = many thin steps = latency-bound, where Loom wins. The exact +0.00% entries at small rack counts are that hiding, not parity.
+
 - Break-even t_pipe (`sweep_tpipe.csv`) — STANDALONE, not in the default suite (optional reviewer-proofing; T3 will measure t_pipe): **3596 ns** (linear, 480 cycles/ns). Its durable use is showing the design tolerates a slow FPGA clock.
 - Regime map (`regime_map.csv`) — STANDALONE, not in the default suite; runs `--pipe-ns 500` so its Loom is NOT the Loom of the other experiments (see 5a.5). Rerun it before quoting:
   **13.9%** at 12% exposed comm -> **3.3%** at 91%. No negative point.

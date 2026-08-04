@@ -8,6 +8,7 @@ Axes are in TIME, not "cycles". The analytical backend ticks 1 cycle = 1 ns
 every cycle count here is divided into us/ms rather than reported raw.
 """
 
+import collections
 import csv
 import os
 import sys
@@ -234,6 +235,37 @@ def plot_p2p():
 
 
 
+def plot_scale():
+    rows = read("scale_sweep.csv")
+    if not rows:
+        return
+    d = collections.defaultdict(dict)
+    for r in rows:
+        d[(int(r["gpus"]), r["collective"], r["size_mb"])][r["system"]] = \
+            int(r["wall_cycles"])
+    combos = sorted({(k[1], k[2]) for k in d}, key=lambda t: (t[0], int(t[1])))
+    gpus = sorted({k[0] for k in d})
+    fig, ax = plt.subplots(figsize=(5, 3.4))
+    for (coll, size), colour in zip(combos, ["#70ad47", "#4472c4",
+                                             "#c00000", "#ed7d31"]):
+        xs, ys = [], []
+        for g in gpus:
+            v = d.get((g, coll, size))
+            if not v or "loom" not in v or "b1_gpu_rdma" not in v:
+                continue
+            xs.append(g)
+            ys.append(100 * (v["b1_gpu_rdma"] - v["loom"]) / v["b1_gpu_rdma"])
+        ax.plot(xs, ys, marker="o", ms=3, lw=1.4, color=colour,
+                label=f"{coll} {size} MB")
+    ax.axhline(0, color="grey", lw=0.8)
+    ax.set_xscale("log", base=2)
+    ax.set_xlabel("cluster size (GPUs, 8 per rack)")
+    ax.set_ylabel("Loom gain over B1 (%)")
+    ax.set_title("Benefit grows with cluster width", fontsize=9)
+    ax.legend(fontsize=7)
+    save(fig, "scale.pdf")
+
+
 def plot_apps():
     rows = read("apps.csv")
     if not rows:
@@ -266,3 +298,4 @@ if __name__ == "__main__":
     plot_matrix()
     plot_apps()
     plot_p2p()
+    plot_scale()
