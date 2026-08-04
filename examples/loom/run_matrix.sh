@@ -50,7 +50,6 @@ for T in "${TOPOS[@]}"; do
   python3 $GEN --mode loom     --racks $RACKS --xpus-per-rack $XPUS $EXTRA -o /tmp/net_loom.yml
   python3 $GEN --mode baseline --racks $RACKS --xpus-per-rack $XPUS $EXTRA -o /tmp/net_base.yml
   python3 $GEN --mode baseline --racks $RACKS --xpus-per-rack $XPUS --rdma-init-ns 2800 $EXTRA -o /tmp/net_b2.yml
-  python3 $GEN --mode ideal    --racks $RACKS --xpus-per-rack $XPUS $EXTRA -o /tmp/net_ideal.yml
   for C in $COLLS; do
     for S in $SIZES; do
       WLDIR=/tmp/microbench && mkdir -p $WLDIR && ( cd $WLDIR && \
@@ -59,8 +58,7 @@ for T in "${TOPOS[@]}"; do
       WL=$WLDIR/$C/${NPUS}npus_${S}MB/$C
       for SYS in "loom loom${SUFFIX}.json /tmp/net_loom.yml" \
                  "b1_gpu_rdma baseline_gpu_rdma${SUFFIX}.json /tmp/net_base.yml" \
-                 "b2_cpu_proxy baseline_cpu_proxy${SUFFIX}.json /tmp/net_b2.yml --rendezvous-protocol=true" \
-                 "b3_ideal ideal_rdma${SUFFIX}.json /tmp/net_ideal.yml"; do
+                 "b2_cpu_proxy baseline_cpu_proxy${SUFFIX}.json /tmp/net_b2.yml --rendezvous-protocol=true"; do
         set -- $SYS; NAME=$1; SYSJ=$2; NET=$3; shift 3
         OUT=$($BIN --workload-configuration=$WL \
           --system-configuration=$ROOT/examples/loom/system/$SYSJ \

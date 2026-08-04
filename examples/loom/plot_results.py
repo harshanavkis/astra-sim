@@ -163,16 +163,16 @@ def plot_p2p():
             int(r["size_kb"])] = int(r["wall_cycles"])
     routes = [r for r in ("in_rack", "cross_rack") if r in data]
     colors = {"loom": "#70ad47", "b1_gpu_rdma": "#8db4e2",
-              "b2_cpu_proxy": "#c00000", "b3_ideal": "#808080"}
+              "b2_cpu_proxy": "#c00000"}
     # left column: absolute cost vs size (log-log) - the fixed per-op offset
     # at small sizes is the whole story. right column: gain over B1.
     fig, axes = plt.subplots(len(routes), 2, figsize=(8, 3 * len(routes)),
                              squeeze=False)
     # dashed + varied width so exactly-superimposed curves stay readable:
-    # in-rack, Loom/B1/B3 are identical BY CONSTRUCTION (same dim0 config),
+    # in-rack, Loom and B1 are identical BY CONSTRUCTION (same dim0 config),
     # and a reader must be able to see that rather than assume a missing line.
     style = {"loom": (2.0, "-"), "b1_gpu_rdma": (1.2, "--"),
-             "b3_ideal": (1.0, ":"), "b2_cpu_proxy": (1.2, "-")}
+             "b2_cpu_proxy": (1.2, "-")}
     for i, route in enumerate(routes):
         ax = axes[i][0]
         for sysname, series in sorted(data[route].items()):
@@ -189,35 +189,57 @@ def plot_p2p():
         if i == 0:
             ax.legend(fontsize=7)
 
-        # gain against BOTH RDMA baselines. In-rack the B1 curve is flat zero
-        # by construction, so plotting it alone would present an assumption
-        # as a measurement; the B2 comparison is the real in-rack result.
         ax = axes[i][1]
         loom = data[route].get("loom")
-        identity = True
-        for base_name, label, colour in (("b1_gpu_rdma", "vs B1 (GPU RDMA)", "#70ad47"),
-                                         ("b2_cpu_proxy", "vs B2 (CPU proxy)", "#c00000")):
-            base = data[route].get(base_name)
-            if not (loom and base):
-                continue
-            sizes = sorted(set(loom) & set(base))
-            gains = [100 * (base[s] - loom[s]) / base[s] for s in sizes]
-            if max(abs(g) for g in gains) > 0.001:
-                identity = False
-            ax.plot([s / 1024 for s in sizes], gains, marker="o", ms=3,
-                    lw=1.2, label=label, color=colour)
-        ax.axhline(0, color="grey", lw=0.8)
-        ax.set_xscale("log")
-        ax.set_xlabel("transfer size (MB)")
-        ax.set_ylabel("Loom gain (%)")
-        ax.set_title(f"{route}: per-op cost vs size", fontsize=9)
-        ax.legend(fontsize=7)
         if route == "in_rack":
-            ax.annotate("Loom = B1 = B3 by construction:\nidentical dim0 "
-                        "(the ToR IS the rack switch).\nNot a measurement — "
-                        "T3 supplies the\nempirical in-rack delta.",
-                        xy=(0.40, 0.55), xycoords="axes fraction", fontsize=6.5,
-                        color="#555555")
+            # NO baseline comparison is meaningful in-rack, so none is drawn.
+            # B1 is identical to Loom BY CONSTRUCTION (the model's own
+            # invariant: in-rack peer access is a plain store for every
+            # system), and B2 differs ONLY because --rendezvous-protocol is a
+            # global flag that charges a large-message handshake to that same
+            # plain store - drop the flag and B2 is byte-identical too.
+            # What the in-rack route IS good for is the reference floor: the
+            # same binary issuing the same store, routed locally instead of
+            # across racks. That ratio is the location-transparency result.
+            cross = data.get("cross_rack", {}).get("loom")
+            if loom and cross:
+                sizes = sorted(set(loom) & set(cross))
+                ratio = [cross[s] / loom[s] for s in sizes]
+                ax.plot([s / 1024 for s in sizes], ratio, marker="o", ms=3,
+                        lw=1.2, color="#4472c4")
+                ax.axhline(1, color="grey", lw=0.8)
+                ax.set_xscale("log")
+                ax.set_xlabel("transfer size (MB)")
+                ax.set_ylabel("cross-rack / in-rack cost")
+                ax.set_title("cost of location, same binary", fontsize=9)
+                ax.annotate("No baseline comparison is drawn in-rack:\n"
+                            "B1 is identical to Loom by construction\n"
+                            "(in-rack is a plain store for every system), and\n"
+                            "B2 differs only via the global rendezvous flag.\n"
+                            "T3 supplies the empirical in-rack delta.",
+                            xy=(0.03, 0.62), xycoords="axes fraction",
+                            fontsize=6.5, color="#555555")
+        else:
+            # B1 and B2 - the two real baselines. The B3 "ideal" system was
+            # removed from the suite on 2026-08-04: it is a bound, not a
+            # system anyone builds, so "gain over B3" is negative by
+            # definition (-160% at 4 KB) and squashed the real curves.
+            for base_name, label, colour in (
+                    ("b1_gpu_rdma", "vs B1 (GPU RDMA)", "#70ad47"),
+                    ("b2_cpu_proxy", "vs B2 (CPU proxy)", "#c00000")):
+                base = data[route].get(base_name)
+                if not (loom and base):
+                    continue
+                sizes = sorted(set(loom) & set(base))
+                gains = [100 * (base[s] - loom[s]) / base[s] for s in sizes]
+                ax.plot([s / 1024 for s in sizes], gains, marker="o", ms=3,
+                        lw=1.2, label=label, color=colour)
+            ax.axhline(0, color="grey", lw=0.8)
+            ax.set_xscale("log")
+            ax.set_xlabel("transfer size (MB)")
+            ax.set_ylabel("Loom gain (%)")
+            ax.set_title(f"{route}: per-op cost amortizes away", fontsize=9)
+            ax.legend(fontsize=7)
     save(fig, "p2p.pdf")
 
 

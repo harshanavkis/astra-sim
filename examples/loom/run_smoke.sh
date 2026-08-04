@@ -22,7 +22,6 @@ python3 $GEN --mode loom     --racks 2 --xpus-per-rack 2 -o /tmp/net_smoke_loom.
 python3 $GEN --mode baseline --racks 2 --xpus-per-rack 2 -o /tmp/net_smoke_b1.yml
 python3 $GEN --mode baseline --racks 2 --xpus-per-rack 2 --rdma-init-ns 2800 \
     -o /tmp/net_smoke_b2.yml
-python3 $GEN --mode ideal    --racks 2 --xpus-per-rack 2 -o /tmp/net_smoke_ideal.yml
 
 echo "system,wall_cycles,exposed_comm_cycles"
 run() {  # $1 label, $2 network yml, $3 system json, extra args...
@@ -38,4 +37,3 @@ run() {  # $1 label, $2 network yml, $3 system json, extra args...
 run loom            /tmp/net_smoke_loom.yml  loom.json
 run b1_gpu_rdma     /tmp/net_smoke_b1.yml    baseline_gpu_rdma.json
 run b2_cpu_proxy    /tmp/net_smoke_b2.yml    baseline_cpu_proxy.json --rendezvous-protocol=true
-run b3_ideal_rdma   /tmp/net_smoke_ideal.yml ideal_rdma.json

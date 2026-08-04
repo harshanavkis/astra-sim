@@ -49,7 +49,6 @@ examples/loom/
 │   ├── baseline_gpu_rdma.json   B1 (its rdma-init lives in the net YAML)
 │   ├── baseline_gpu_rdma_roofline.json  B1 + peak-perf 839 (20/132 SM tax)
 │   ├── baseline_cpu_proxy.json  B2 (run with --rendezvous-protocol=true)
-│   └── ideal_rdma.json          B3 upper bound
 ├── remote_memory/
 │   └── loom_peer_reads.json   LOOM_PEER_READS read-credit config
 │                              (finite cap; >= outstanding loads = infinite)
@@ -184,7 +183,7 @@ lookup — the connection identifies the binding).
 
 | Constant | Value | Named source |
 |---|---|---|
-| endpoint-delay (ALL systems) | 10 ns | in-repo `examples/system/native_collectives/HGX-H100-validated.json`, validated against real HGX-H100 runs in ASTRA-sim 2.0 (Won et al., ISPASS 2023); ideal B3 keeps 1 ns (event queue rejects 0) |
+| endpoint-delay (ALL systems) | 10 ns | in-repo `examples/system/native_collectives/HGX-H100-validated.json`, validated against real HGX-H100 runs in ASTRA-sim 2.0 (Won et al., ISPASS 2023) |
 | scale-up hop (alt. preset) | 936.25 ns / 400 GB/s | in-repo `HGX-H100-validated.yml`, same validation (Won et al., ISPASS 2023) |
 | fabric hop (default dim0) | 500 ns / 64 GB/s | PCIe5 x16 switch-class estimate; cross-check: Li, Ammar et al., "Evaluating Modern GPU Interconnect", IEEE TPDS 2020 (PCIe/NVLink microbenchmarks) — [verify exact figure] |
 | inter-ToR wire+switch | 600 ns | Broadcom Tomahawk/Trident-class cut-through latency (300–800 ns, vendor datasheets/briefs) + propagation — [verify exact figure] |
@@ -201,19 +200,19 @@ specific value should be pinned to a page/table before the paper cites it.
 
 ## Suite inventory (what runs, what it produces)
 
-`run_all.sh` = 5 experiments, **196 simulator invocations**, ~8–12 min in
+`run_all.sh` = 5 experiments, **151 simulator invocations**, ~6–10 min in
 Docker (matrix dominates). Each experiment writes one CSV to `results/`;
 `plot_results.py` renders one PDF per CSV (skips missing ones).
 
 | Experiment | Sim runs | CSV (columns) | Plot | Shows |
 |---|---|---|---|---|
-| smoke | 4 (Loom,B1,B2,B3) | `smoke.csv` (system, wall_cycles, exposed_comm_cycles) | `smoke.pdf` bars | endpoint-model sanity on shipped ETs (comm-only) |
+| smoke | 3 (Loom,B1,B2) | `smoke.csv` (system, wall_cycles, exposed_comm_cycles) | `smoke.pdf` bars | endpoint-model sanity on shipped ETs (comm-only) |
 | sweep_credits | 8 (credits 1…64, 2^20=∞) | `sweep_credits.csv` (read_credits, wall_cycles) | `credits.pdf` log-log line | exact linear concurrency scaling; ∞ = uncapped design |
 | sweep_tpipe | 7 (6 t_pipe × Loom + B1) | `sweep_tpipe.csv` (system, t_pipe_ns, wall_cycles) | `tpipe.pdf` curve + B1 line | source-pipeline break-even |
 | regime_map | 12 (6 compute-speeds × 2) | `regime_map.csv` (compute_speedup, loom, b1, gain_pct, exposed_comm_pct) | `regime.pdf` gain curve + SM ceiling | where Loom wins: gain vs comm-boundedness |
-| matrix | 96 (2 scales × 4 coll × 3 sizes × 4 sys; all `[Switch, Switch]`) | `matrix.csv` (topology, collective, size_mb, system, wall, exposed) | `matrix.pdf` gain grid, one row per size | scale × collective × size coverage (16 and 64 XPUs) |
+| matrix | 72 (2 scales × 4 coll × 3 sizes × 3 sys; all `[Switch, Switch]`) | `matrix.csv` (topology, collective, size_mb, system, wall, exposed) | `matrix.pdf` gain grid, one row per size | scale × collective × size coverage (16 and 64 XPUs) |
 | apps | 8 (4 configs × Loom/B1) | `apps.csv` (app, ranks, system, wall, exposed) | `apps.pdf` gain bars | Mixtral MoE + GPT-3 at two scales (published shapes) |
-| p2p_sweep | 80 (2 routes × 10 sizes × 4 sys) | `p2p_sweep.csv` (route, size_kb, system, wall_cycles) | `p2p.pdf` cost-vs-size + gain-vs-size, per route | M2: per-op cost and its crossover; KB-granular, so unlike the collective grid it reaches 4 KB |
+| p2p_sweep | 60 (2 routes × 10 sizes × 3 sys) | `p2p_sweep.csv` (route, size_kb, system, wall_cycles) | `p2p.pdf` cost-vs-size + gain-vs-size, per route | M2: per-op cost and its crossover; KB-granular, so unlike the collective grid it reaches 4 KB |
 | *(F2, answered)* run_f2.sh | 104 (matrix+apps under `direct`) | `matrix_direct.csv`, `apps_direct.csv` | — | ring-vs-direct control; on the deployed topology the two agree to 0.02%, so the question is moot |
 | *(optional)* victim | 3 (solo/voq/shared_fifo) | `victim.csv` (case, victim_fct_cycles) | `victim.pdf` bars | standalone demo only; not in run_all |
 
@@ -231,7 +230,7 @@ Docker (matrix dominates). Each experiment writes one CSV to `results/`;
   the only script reading static configs, which had rotted to a model
   where Loom was slower than the baseline, and the README read that
   backwards as an honest loss. It now generates its configs like every
-  other script, and the ordering (B3 < Loom < B1 < B2) is the check.
+  other script, and the ordering (Loom < B1 < B2) is the check.
 - **sweep_credits** — demonstrates the read-credit mechanism (paper §6.3)
   is implemented faithfully: the exact 1x/2x/…/64x scaling and the ∞ point
   collapsing onto 64 are arithmetic predictions; matching them exactly is

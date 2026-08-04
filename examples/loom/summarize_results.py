@@ -109,7 +109,7 @@ def matrix_lines(csv_name="matrix.csv", label="Matrix"):
     else:
         out.append("  No negative cells.")
     # vs the other baselines
-    for other, name in (("b2_cpu_proxy", "B2"), ("b3_ideal", "B3")):
+    for other, name in (("b2_cpu_proxy", "B2"),):
         gs = [gain(v[other], v["loom"]) for v in cells.values()
               if other in v and "loom" in v]
         if not gs:
