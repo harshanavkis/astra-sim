@@ -169,7 +169,7 @@ classes); only the hardware runs remain to fill this table.
 | `--t-encap` | TX Encapsulator | 100 ns | T3, stage counter |
 | `--roce-stack-ns` | QP Router + RoCEv2 engine per side (RX incl. RX Decapsulator) | 150 ns | Coyote RoCE RC ping-pong floor |
 | `--t-translate` | Transaction Generator (Bounds Checker + Address Translation) | 15 ns | T3, stage counter |
-| `--t-forward` | Local Forward Engine egress | 10 ns | T3, stage counter |
+| `--t-forward` | Local Forward Engine egress | 10 ns | T3, stage counter. **NOT charged on the local route or at the remote destination** (2026-08-04): the Loom ToR IS the rack switch, so that forwarding is already inside `--fabric-latency`; counting it again was a double-count. Local adder = `t_lookup + t_translate` = 40 ns; destination = `t_translate` = 15 ns. |
 | Loom goodput vs message size (coalescing curve) | TX Encapsulator coalescer | 0.95 flat = identical to RoCE (bulk adds no wire bytes); the real, size-dependent overhead is the sub-64 B envelope, deliberately unmodeled | T2 curve, coalescer on/off |
 | read RTT + credit behavior | Read Credit Tracker | remote-mem-latency 5000 ns | T6 |
 | B2 rdma-init | (baseline, same hosts) | 2800 ns | testbed CPU-verbs post+poll run |

@@ -30,13 +30,30 @@ MODES = ("loom", "baseline", "ideal")
 def build_yaml(args) -> str:
     if args.mode == "loom":
         # stage sums (hw-controller blocks); coarse knobs override if set
+        # t_forward is deliberately NOT in either local-route term: the Loom
+        # ToR IS the rack switch, and its forwarding is already inside
+        # fabric_latency. Charging t_forward here counted it twice
+        # (fixed 2026-08-04; the adder was 50 ns, is now 40).
+        #
+        # These adders are the INCREMENT over a stock switch, and even 40 ns
+        # is an upper bound: a stock GPU switch already does this class of
+        # work in its datapath. NVIDIA's NVSwitch overview documents "final
+        # hop-address fidelity checks and buffer over- and underflow checks"
+        # with "routing tables ... limiting an application's access to its
+        # specific ranges" - i.e. range-indexed lookup + bounds checking,
+        # which is what t_lookup + t_translate model. Integrated parts go
+        # further still (Enfabrica ACF-S fuses PCIe/CXL switch, NIC and
+        # address translation on one die). T3 resolves this properly by
+        # measuring the Loom datapath AGAINST raw Coyote forwarding, which
+        # is a delta by construction.
         pipe_local = (args.pipe_local_ns if args.pipe_local_ns is not None
-                      else args.t_lookup + args.t_translate + args.t_forward)
+                      else args.t_lookup + args.t_translate)
         pipe_src = (args.pipe_ns if args.pipe_ns is not None
                     else args.t_lookup + args.t_queue + args.t_encap)
         # destination does NO range lookup (the connection identifies the
-        # binding): bounds/translate + local forward only
-        dest_logic = args.t_translate + args.t_forward
+        # binding): bounds/translate only - its egress forwarding is likewise
+        # already inside the fabric_latency edge leg counted in lat1 below
+        dest_logic = args.t_translate
         # in-rack: the Loom ToR IS the rack switch (whose forwarding is
         # already inside fabric_latency); Loom adds only the table lookups
         lat0 = args.fabric_latency + pipe_local
@@ -123,9 +140,13 @@ def main():
                         "(= t_lookup + t_queue + t_encap = 200 by default); "
                         "swept by run_sweep_tpipe.sh; testbed T3")
     p.add_argument("--pipe-local-ns", type=float, default=None,
-                   help="OVERRIDE local-route adder "
-                        "(= t_lookup + t_translate + t_forward = 50 by "
-                        "default); testbed T3 vs raw Coyote forwarding")
+                   help="OVERRIDE local-route adder (= t_lookup + t_translate "
+                        "= 40 by default; t_forward is NOT included - the ToR "
+                        "IS the rack switch and its forwarding is already "
+                        "inside --fabric-latency). Upper bound: stock GPU "
+                        "switches already do range-indexed lookup and bounds "
+                        "checks. Testbed T3 measures it as a delta vs raw "
+                        "Coyote forwarding.")
     p.add_argument("--loom-goodput", type=float, default=0.95,
                    help="Loom goodput factor at the run's message mix. Equal to "
                         "--roce-goodput by default because BULK Loom traffic is "
