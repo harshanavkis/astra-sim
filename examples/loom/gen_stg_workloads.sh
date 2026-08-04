@@ -14,6 +14,14 @@ STG="$(dirname "$0")/../../extern/graph_frontend/stage"
 #           8 experts top-2 (Jiang et al., arXiv:2401.04088)
 #   dense = GPT-3 175B: dmodel 12288, dff 49152, 96 heads
 #           (Brown et al., NeurIPS'20)
+#   dsv3  = DeepSeek-V3: dmodel 7168, 256 routed experts top-8, per-expert
+#           intermediate 2048, 128 heads, seq 4096 (DeepSeek-AI,
+#           arXiv:2412.19437). Modernises the moe preset, whose Mixtral
+#           8-expert/top-2 shape is dated: 32x more experts and 4x the
+#           top-k means far more, far smaller all-to-all messages - the
+#           regime where the divide costs most. NOTE MLA is NOT modelled
+#           (STG has no latent-attention path); kvhead=head approximates
+#           MHA, which OVERSTATES attention KV traffic vs real DSv3.
 # num_stacks/batch/seq are workload-scale knobs (layers are homogeneous, so
 # per-iteration time extrapolates linearly in stacks); override as needed.
 case $KIND in
@@ -23,7 +31,10 @@ case $KIND in
   dense) set -- --model_type dense --dp 4 --tp 4 --pp 2 \
              --dmodel 12288 --dff 49152 --head 96 --kvhead 96 \
              --num_stacks 4 --batch 8 --seq 2048 "$@" ;;
-  *) echo "usage: $0 moe|dense <outdir> [stg args]"; exit 1 ;;
+  dsv3)  set -- --model_type moe --dp 2 --tp 4 --pp 1 --ep 8 \
+             --dmodel 7168 --dff 2048 --head 128 --kvhead 128 \
+             --experts 256 --kexperts 8 --num_stacks 4 --batch 8 --seq 4096 "$@" ;;
+  *) echo "usage: $0 moe|dense|dsv3 <outdir> [stg args]"; exit 1 ;;
 esac
 (cd "$STG" && python3 main.py --output_dir "$OUT" --output_name "$KIND.%d.et" "$@")
 echo "workload: $OUT/$KIND   comm groups: $OUT/$KIND.json"

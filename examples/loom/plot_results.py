@@ -30,8 +30,12 @@ def read(name):
         return list(csv.DictReader(f))
 
 
+WRITTEN = []
+
+
 def save(fig, name):
     out = os.path.join(RES, name)
+    WRITTEN.append(name)
     fig.tight_layout()
     fig.savefig(out)
     plt.close(fig)
@@ -268,6 +272,73 @@ def plot_scale():
     save(fig, "scale.pdf")
 
 
+def plot_sm():
+    rows = read("sm_sweep.csv")
+    if not rows:
+        return
+    d = collections.defaultdict(dict)
+    for r in rows:
+        d[(r["app"], int(r["reserved_sms"]))][r["system"]] = (
+            int(r["wall_cycles"]), int(r["exposed_comm"]))
+    apps = sorted({r["app"] for r in rows})
+    ks = sorted({int(r["reserved_sms"]) for r in rows})
+    fig, ax = plt.subplots(figsize=(5, 3.4))
+    for app, colour in zip(apps, ["#4472c4", "#70ad47", "#c00000"]):
+        xs, wall, comm = [], [], []
+        for k in ks:
+            v = d.get((app, k))
+            if not v or "loom" not in v:
+                continue
+            lw, le = v["loom"]
+            bw, be = v["b1_gpu_rdma"]
+            xs.append(k)
+            wall.append(100 * (bw - lw) / bw)
+            comm.append(100 * (be - le) / be)
+        ax.plot(xs, wall, marker="o", ms=4, lw=1.6, color=colour, label=f"{app} wall")
+        ax.plot(xs, comm, marker="s", ms=3, lw=1.0, ls="--", color=colour,
+                alpha=0.6, label=f"{app} exposed comm")
+    ax.axvline(20, color="grey", lw=0.8, ls=":")
+    ax.annotate("DeepSeek-V3\nreserves 20", xy=(20, ax.get_ylim()[1] * 0.55),
+                fontsize=6.5, color="#555555", ha="center")
+    ax.axhline(0, color="grey", lw=0.8)
+    ax.set_xlabel("SMs reserved for communication by the baseline (of 132)")
+    ax.set_ylabel("Loom gain over B1 (%)")
+    ax.set_title("k=0 isolates the pure communication benefit", fontsize=9)
+    ax.legend(fontsize=6.5)
+    save(fig, "sm.pdf")
+
+
+def plot_domain():
+    rows = read("domain_sweep.csv")
+    if not rows:
+        return
+    d = collections.defaultdict(dict)
+    for r in rows:
+        d[(int(r["xpus_per_rack"]), r["collective"], r["size_mb"])][r["system"]] = \
+            int(r["wall_cycles"])
+    doms = sorted({k[0] for k in d})
+    combos = sorted({(k[1], k[2]) for k in d}, key=lambda t: (t[0], int(t[1])))
+    total = int(rows[0]["gpus"])
+    fig, ax = plt.subplots(figsize=(5, 3.4))
+    width = 0.8 / len(combos)
+    for i, (coll, size) in enumerate(combos):
+        ys = []
+        for m in doms:
+            v = d.get((m, coll, size))
+            ys.append(100 * (v["b1_gpu_rdma"] - v["loom"]) / v["b1_gpu_rdma"]
+                      if v else 0)
+        ax.bar([x + i * width for x in range(len(doms))], ys, width,
+               label=f"{coll} {size} MB")
+    ax.set_xticks([x + 0.4 - width / 2 for x in range(len(doms))],
+                  [f"{m}/rack\n({total // m} racks)" for m in doms], fontsize=8)
+    ax.axhline(0, color="grey", lw=0.8)
+    ax.set_ylabel("Loom gain over B1 (%)")
+    ax.set_title(f"Bigger scale-up domains shrink the comm win ({total} GPUs)",
+                 fontsize=9)
+    ax.legend(fontsize=6.5)
+    save(fig, "domain.pdf")
+
+
 def plot_apps():
     rows = read("apps.csv")
     if not rows:
@@ -290,6 +361,72 @@ def plot_apps():
     save(fig, "apps.pdf")
 
 
+FIGURE_NOTES = {
+ "p2p.pdf": ("M2 point-to-point sweep",
+  "One send/recv pair, 4 KB-1 GB, 8 iterations, 2 racks x 8 XPUs. Loom vs B1 (GPU-initiated RDMA) and B2 (CPU proxy). `run_p2p_sweep.sh`.",
+  "Left: time per transfer (us, log-log). Right: Loom gain (%) vs size.",
+  "The ONLY experiment with no collective chunk-overlap, so the fixed per-operation cost Loom removes is directly visible; the gain decays to zero as the transfer grows and that cost amortizes. The in-rack curve is a reference FLOOR only - no baseline is compared against it, because B1 is identical to Loom by construction (in-rack is a plain store for every system) and B2 differed only via the global rendezvous flag."),
+ "scale.pdf": ("A5 cluster-scale sweep",
+  "8 XPUs/rack FIXED (the deployed scale-up domain); RACK COUNT swept 2..64 = 16..512 GPUs; all_reduce and all_to_all at 1 and 64 MB. `run_scale_sweep.sh`.",
+  "Loom gain over B1 (%) vs cluster size.",
+  "Loom's benefit is a FUNCTION OF CLUSTER WIDTH - no single gain number is meaningful without stating the scale. A hierarchical collective spreads a roughly constant dim1 byte count over 2(r-1) steps, so per-step bytes fall as ~1/r while per-step latency is fixed: few racks = few fat steps = bandwidth-bound and Loom's latency edge is hidden; many racks = many thin steps = latency-bound and Loom wins. Exact +0.00% points at small rack counts are that hiding, NOT parity."),
+ "sm.pdf": ("A6 SM-reservation sweep",
+  "There is no SM in ASTRA-sim: the tax is a roofline derating, peak_perf = 989*(132-k)/132, applied to the BASELINE only. k swept 0/8/20/32; k=20 is DeepSeek-V3's disclosed reservation. `run_sm_sweep.sh`.",
+  "Loom gain over B1 (%) vs reserved SMs. Solid = wall, dashed = exposed comm (overlap-dependent, not pure comm time).",
+  "k=0 isolates the PURE communication benefit. The dense LLM's is ~zero (+0.02%), so its entire gain is SM reclamation; MoE is carried by communication (+13.90% at k=0) with reclamation adding ~1.4pp - quote them separately. Caveat: perf is a min(), so only compute-bound nodes are derated and the compute gain lands below the ideal k/132; the model UNDER-states the SM tax (MEMBW=1 recovers exactly 15.15% at k=20)."),
+ "domain.pdf": ("Scale-up domain-size sweep (the NVL72 question)",
+  "Cluster held CONSTANT at 576 GPUs while the scale-up domain grows: 8/rack (HGX) -> 36 (NVL36) -> 72 (NVL72), so racks shrink 72 -> 16 -> 8. `run_domain_sweep.sh`.",
+  "Loom gain over B1 (%) per collective and size, grouped by domain size.",
+  "Runs AGAINST Loom's communication differential and must not be dropped. At a fixed cluster size, NVL72-class racks erase the comm win almost entirely. It BOUNDS which argument carries the paper in which deployment rather than refuting it: SM reclamation is topology-independent (+10.72% either way), Loom is never worse than B1 (the floor is parity), and the removal of QPs/keys/buffers from the accelerator is not modelled here at all."),
+ "matrix.pdf": ("Collective matrix",
+  "Cluster size x collective x buffer size; one physical topology [Switch, Switch], 8 XPUs/rack. `run_matrix.sh`.",
+  "Loom gain over B1 (%), one panel row per buffer size, green positive / red negative.",
+  "Gains fall as buffers grow because Loom's advantage is per-operation. Cells reading exactly +0.000% are NOT wins: there the model hides dim1 latency for both systems and dim0 is identical by construction, so nothing can differ."),
+ "apps.pdf": ("End-to-end applications",
+  "STG-generated Mixtral 8x7B and GPT-3 175B iterations at 16-256 ranks, 8 XPUs/rack, roofline configs carrying the k=20 SM tax. `run_apps.sh`.",
+  "Loom gain over B1 (%) per app and rank count.",
+  "MoE improves with scale (EP all-to-all is per-operation bound); dense is bandwidth-bound and gains almost nothing on communication. Measured: taking rdma_init 0 -> 2400 ns changes B1's exposed comm by +38.4% for mixtral but only +0.06% for gpt3."),
+ "smoke.pdf": ("Endpoint-model sanity check",
+  "4-NPU 1 MB all-to-all on the repo's shipped ETs, 2 racks x 2. `run_smoke.sh`.",
+  "Wall and exposed-comm time (us) per system.",
+  "A canary, not a result: the ordering Loom < B1 < B2 is the check. It caught a real bug - until 2026-08-04 this was the only script reading static configs, which had rotted to a model in which Loom was slower."),
+ "credits.pdf": ("M5 read-credit cap",
+  "4 ranks x 64 independent 4 KB peer reads through LOOM_PEER_READS; caps 1..64 plus uncapped. `run_sweep_credits.sh`.",
+  "Completion time (us) vs credits per NPU, log-log.",
+  "A mechanism proof, not a benchmark: exact linear 1/N scaling and the uncapped point collapsing onto the 64-credit point are arithmetic predictions, and matching them exactly is the verification."),
+ "tpipe.pdf": ("t_pipe break-even (STANDALONE)",
+  "Loom's source-pipeline latency swept against a fixed B1. `run_sweep_tpipe.sh`; not in the default suite.",
+  "Completion time (ms) vs t_pipe, with B1 as a horizontal line.",
+  "Optional reviewer-proofing; T3 will MEASURE t_pipe and retire it. Its durable use is showing the design tolerates a slow FPGA clock."),
+ "regime.pdf": ("Regime map (STANDALONE)",
+  "Compute intensity scaled with the SM ratio pinned. `run_regime_map.sh`; not in the default suite.",
+  "Loom gain over B1 (%) vs exposed-communication fraction.",
+  "Runs --pipe-ns 500, so its Loom is NOT the Loom of the other experiments - rerun before quoting. Largely superseded by the apps gain decomposition, which uses real published workloads for free."),
+}
+
+
+def write_figures_md():
+    """Regenerate results/FIGURES.md for exactly the figures just produced."""
+    out = ["# Figures - what each plot shows", "",
+           "> GENERATED by `plot_results.py`; overwritten every time the plots",
+           "> are regenerated. Do not hand-edit. The NUMBERS live in CHECKPOINT",
+           "> section 5 (generated by `summarize_results.py` from the same",
+           "> CSVs); this file explains what the figures MEAN.", ""]
+    for name in WRITTEN:
+        note = FIGURE_NOTES.get(name)
+        if not note:
+            continue
+        title, method, metric, reading = note
+        out += [f"## `{name}` - {title}", "",
+                f"- **Methodology.** {method}",
+                f"- **Metric.** {metric}",
+                f"- **Reading.** {reading}", ""]
+    path = os.path.join(RES, "FIGURES.md")
+    with open(path, "w") as fh:
+        fh.write("\n".join(out))
+    print(f"wrote {path}")
+
+
 if __name__ == "__main__":
     os.makedirs(RES, exist_ok=True)
     plot_smoke()
@@ -301,3 +438,6 @@ if __name__ == "__main__":
     plot_apps()
     plot_p2p()
     plot_scale()
+    plot_sm()
+    plot_domain()
+    write_figures_md()
