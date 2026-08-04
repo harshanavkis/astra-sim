@@ -295,6 +295,34 @@ matters:
    direct coincide. Corollary worth stating before any scale claim: a
    "64-rank" STG app never runs a 64-rank collective.
 
+**THE MATRIX SHAPES UNDER-EXERCISE dim1 - THE ONE DIMENSION LOOM CHANGES
+(measured 2026-08-04). This is an evaluation-design problem, not just an
+explanation of the ties.**
+
+Same 64 ranks, same 64 MB all_reduce, different rack shape:
+
+| shape | Loom | B1 | gain |
+|---|---|---|---|
+| 8 racks x 8 XPUs (in the grid) | 909,088 | 909,088 | **+0.000%** |
+| **16 racks x 4 XPUs** (not in the grid) | 893,338 | 1,059,538 | **+15.7%** |
+
+Why: with `localBWAware` and 8 XPUs per rack, the hierarchical all_reduce
+keeps nearly all bytes on dim0 and sends only the reduced slice across
+racks. Measured contribution of each dimension (B1, all_reduce 64 MB,
+8x8): halving dim1 bandwidth 50 -> 25 GB/s costs **+1%** (909,088 ->
+918,083) while halving dim0 bandwidth 64 -> 32 GB/s costs **+94%**
+(-> 1,763,592). So the cell is dim0-bound, and dim0 is identical for both
+systems by construction. Of the ~1% that does cross racks, the bandwidth
+term is now equal (both 47.5 GB/s since the goodput fix) and the latency
+term (Loom 1615 vs B1 3000 ns) is pipelined away by concurrent chunks -
+latency overlaps, bandwidth serializes.
+
+**Consequence: both matrix shapes (4x4 and 8x8) are rack-heavy, so the
+grid is biased against Loom and its 64 MB column largely measures the rack
+fabric.** The grid axis that matters for Loom is the RACKS : XPUS-PER-RACK
+ratio, not total scale. OPEN: add a wide shape (e.g. 16x4) so dim1 is
+actually exercised; decide whether to replace 4x4/8x8 or add to them.
+
 **HOW THE all_reduce 64 MB CELL WENT FROM -0.31% TO +0.000% (2026-08-04).**
 It did not get better - it became a TIE, and the tie is forced. The
 negative was entirely the in-rack `t_pipe_local` adder, measured directly
