@@ -124,24 +124,32 @@ def plot_matrix():
         return
     topos = sorted({r["topology"] for r in rows})
     colls = sorted({r["collective"] for r in rows})
-    size = "16"  # representative size for the headline grid
-    fig, axes = plt.subplots(1, len(topos), figsize=(3 * len(topos), 3),
-                             sharey=True)
-    for ax, topo in zip(axes, topos):
-        gains = []
-        for c in colls:
-            sel = {r["system"]: int(r["wall_cycles"]) for r in rows
-                   if r["topology"] == topo and r["collective"] == c
-                   and r["size_mb"] == size}
-            gains.append(100 * (sel["b1_gpu_rdma"] - sel["loom"]) / sel["b1_gpu_rdma"]
-                         if "loom" in sel and "b1_gpu_rdma" in sel else 0)
-        colors = ["#70ad47" if g >= 0 else "#c00000" for g in gains]
-        ax.bar(range(len(colls)), gains, 0.6, color=colors)
-        ax.axhline(0, color="grey", lw=0.8)
-        ax.set_xticks(range(len(colls)),
-                      [c.replace("_", "\n") for c in colls], fontsize=7)
-        ax.set_title(topo, fontsize=9)
-    axes[0].set_ylabel(f"Loom gain over B1 (%), {size}MB")
+    # every size present, not one hard-coded slice: the size dependence IS
+    # the result (gain shrinks as buffers grow), and a single-size grid hid
+    # both the small-message wins and the negative large-message cells.
+    sizes = sorted({r["size_mb"] for r in rows}, key=int)
+    fig, axes = plt.subplots(len(sizes), len(topos),
+                             figsize=(3 * len(topos), 2.8 * len(sizes)),
+                             sharey="row", squeeze=False)
+    for i, size in enumerate(sizes):
+        for j, topo in enumerate(topos):
+            ax = axes[i][j]
+            gains = []
+            for c in colls:
+                sel = {r["system"]: int(r["wall_cycles"]) for r in rows
+                       if r["topology"] == topo and r["collective"] == c
+                       and r["size_mb"] == size}
+                gains.append(100 * (sel["b1_gpu_rdma"] - sel["loom"]) / sel["b1_gpu_rdma"]
+                             if "loom" in sel and "b1_gpu_rdma" in sel else 0)
+            colors = ["#70ad47" if g >= 0 else "#c00000" for g in gains]
+            ax.bar(range(len(colls)), gains, 0.6, color=colors)
+            ax.axhline(0, color="grey", lw=0.8)
+            ax.set_xticks(range(len(colls)),
+                          [c.replace("_", "\n") for c in colls], fontsize=7)
+            if i == 0:
+                ax.set_title(topo, fontsize=9)
+        axes[i][0].set_ylabel(f"gain over B1 (%)\n{size} MB", fontsize=8)
+    fig.tight_layout()
     save(fig, "matrix.pdf")
 
 

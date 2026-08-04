@@ -10,6 +10,8 @@ ROOT=$PWD
 BIN=$ROOT/build/astra_analytical/build/bin/AstraSim_Analytical_Congestion_Unaware
 RM=$ROOT/examples/remote_memory/analytical/no_memory_expansion.json
 examples/loom/fetch_stg.sh >/dev/null 2>&1
+# SUFFIX: "" = default ring algorithms, "_direct" = direct variants (F2).
+SUFFIX=${SUFFIX:-}
 
 # app kind ranks racks xpus stg-overrides...
 CFGS=("mixtral_moe moe 16 4 4"
@@ -24,8 +26,8 @@ for CFG in "${CFGS[@]}"; do
   [ -f $WL/$KIND.json ] || examples/loom/gen_stg_workloads.sh $KIND $WL "$@" >/dev/null 2>&1
   python3 examples/loom/gen_network_config.py --mode loom --racks $RACKS --xpus-per-rack $XPUS -o /tmp/net_loom.yml
   python3 examples/loom/gen_network_config.py --mode baseline --racks $RACKS --xpus-per-rack $XPUS -o /tmp/net_base.yml
-  for SYS in "loom loom_roofline.json /tmp/net_loom.yml" \
-             "b1_gpu_rdma baseline_gpu_rdma_roofline.json /tmp/net_base.yml"; do
+  for SYS in "loom loom_roofline${SUFFIX}.json /tmp/net_loom.yml" \
+             "b1_gpu_rdma baseline_gpu_rdma_roofline${SUFFIX}.json /tmp/net_base.yml"; do
     set -- $SYS
     OUT=$($BIN --workload-configuration=$WL/$KIND \
       --system-configuration=$ROOT/examples/loom/system/$2 \

@@ -18,7 +18,7 @@ Modes:
 
 Example:
   ./gen_network_config.py --mode loom --racks 8 --xpus-per-rack 16 \
-      --pipe-ns 500 --loom-goodput 0.94 -o network/loom_8racks_16xpus.yml
+      --pipe-ns 500 --loom-goodput 0.94 -o /tmp/net_loom.yml
 """
 
 import argparse

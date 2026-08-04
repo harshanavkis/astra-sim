@@ -30,14 +30,18 @@ the first real backend change, in `congestion_aware/Device`.)
 ```
 examples/loom/
 ├── README.md                  this file: run guide, constants, VOQ explainer
-├── CHECKPOINT.md              LIVING: full project state for session restart
-├── CODE-MAP.md                LIVING: every artifact -> real-system mapping
+├── CHECKPOINT.md              LIVING: the single state doc. Sec 5 results are
+│                              GENERATED; 5a Phase-A findings; 5b catalog;
+│                              6 next steps; 8 code->real-system map;
+│                              9 review verdicts + reviewer defenses
 ├── ANALYTICAL-MODEL.md        LIVING: equations, constants + decisions ledgers
+├── summarize_results.py       regenerates CHECKPOINT sec 5 from results/*.csv
 │
 ├── gen_network_config.py      network-YAML generator (loom/baseline/ideal);
 │                              per-stage pipeline params, one per hw block
-├── network/                   generated YAMLs, committed as samples (header
-│                              comment = exact command to regenerate)
+│                              (no network/ dir: every script generates its
+│                              configs at run time. The committed samples
+│                              rotted to a dead model and were deleted.)
 ├── system/                    endpoint models (system JSONs):
 │   ├── loom.json                Loom: endpoint-delay 10ns, 2-dim collectives
 │   ├── loom_1d.json             1-dim variant (congestion-aware runs)
@@ -65,6 +69,8 @@ examples/loom/
 ├── run_regime_map.sh          gain vs comm-boundedness (SM ceiling)
 ├── run_matrix.sh              collectives x sizes x topologies x systems
 ├── run_apps.sh                Mixtral MoE + GPT-3 dense at two scales
+├── run_f2.sh                  F2 control: matrix+apps under direct algorithms
+│                              (SUFFIX=_direct selects system/*_direct.json)
 ├── run_all.sh                 whole suite -> results/*.csv (in Docker)
 ├── run_all_docker.sh          one-command host entry (build image, run, plot)
 ├── plot_results.py            results/*.csv -> results/*.pdf
@@ -86,7 +92,7 @@ Code living OUTSIDE this folder (the simulator extensions):
   limit).
 - `/CLAUDE.md` (repo root) — standing working rules.
 
-See CODE-MAP.md for what each piece models in the real system.
+See CHECKPOINT.md section 8 for what each piece models in the real system.
 
 ## Workload provenance
 
@@ -185,19 +191,28 @@ Docker (matrix dominates). Each experiment writes one CSV to `results/`;
 |---|---|---|---|---|
 | smoke | 4 (Loom,B1,B2,B3) | `smoke.csv` (system, wall_cycles, exposed_comm_cycles) | `smoke.pdf` bars | endpoint-model sanity on shipped ETs (comm-only) |
 | sweep_credits | 8 (credits 1…64, 2^20=∞) | `sweep_credits.csv` (read_credits, wall_cycles) | `credits.pdf` log-log line | exact linear concurrency scaling; ∞ = uncapped design |
-| sweep_tpipe | 7 (6 t_pipe × Loom + B1) | `sweep_tpipe.csv` (system, t_pipe_ns, wall_cycles) | `tpipe.pdf` curve + B1 line | source-pipeline break-even (~2 µs) |
-| regime_map | 12 (6 compute-speeds × 2) | `regime_map.csv` (compute_speedup, loom, b1, gain_pct, exposed_comm_pct) | `regime.pdf` gain curve + SM ceiling | where Loom wins: gain → 15% ceiling compute-bound, parity comm-bound |
-| matrix | 192 (4 topo × 4 coll × 3 sizes × 4 sys) | `matrix.csv` (topology, collective, size_mb, system, wall, exposed) | `matrix.pdf` 4-panel gain grid (16 MB) | traffic patterns × topologies coverage |
-| apps | 8 (4 configs × Loom/B1) | `apps.csv` (app, ranks, system, wall, exposed) | `apps.pdf` gain bars | Mixtral MoE +7.5/+15%, GPT-3 +5% (published shapes) |
+| sweep_tpipe | 7 (6 t_pipe × Loom + B1) | `sweep_tpipe.csv` (system, t_pipe_ns, wall_cycles) | `tpipe.pdf` curve + B1 line | source-pipeline break-even |
+| regime_map | 12 (6 compute-speeds × 2) | `regime_map.csv` (compute_speedup, loom, b1, gain_pct, exposed_comm_pct) | `regime.pdf` gain curve + SM ceiling | where Loom wins: gain vs comm-boundedness |
+| matrix | 192 (4 topo × 4 coll × 3 sizes × 4 sys) | `matrix.csv` (topology, collective, size_mb, system, wall, exposed) | `matrix.pdf` gain grid, one row per size | traffic patterns × topologies coverage |
+| apps | 8 (4 configs × Loom/B1) | `apps.csv` (app, ranks, system, wall, exposed) | `apps.pdf` gain bars | Mixtral MoE + GPT-3 at two scales (published shapes) |
+| *(F2)* run_f2.sh | 200 (matrix+apps under `direct`) | `matrix_direct.csv`, `apps_direct.csv` | — | ring-vs-direct algorithm control |
 | *(optional)* victim | 3 (solo/voq/shared_fifo) | `victim.csv` (case, victim_fct_cycles) | `victim.pdf` bars | standalone demo only; not in run_all |
+
+> **No result numbers in this file.** They live in CHECKPOINT.md section 5,
+> which `summarize_results.py` generates from `results/*.csv`. This README
+> used to quote results and drifted from the data every time the suite was
+> rerun.
 
 ### Why each experiment exists
 
 - **smoke** — the cheapest end-to-end correctness check that all four
   endpoint models run and order sensibly on workloads we did not author
   (the repo's shipped ETs). It is the canary: if a model change breaks
-  semantics, smoke shifts first. Being comm-only, it also honestly shows
-  Loom does NOT win when there is no compute to reclaim.
+  semantics, smoke shifts first — and it did: until 2026-08-04 this was
+  the only script reading static configs, which had rotted to a model
+  where Loom was slower than the baseline, and the README read that
+  backwards as an honest loss. It now generates its configs like every
+  other script, and the ordering (B3 < Loom < B1 < B2) is the check.
 - **sweep_credits** — demonstrates the read-credit mechanism (paper §6.3)
   is implemented faithfully: the exact 1x/2x/…/64x scaling and the ∞ point
   collapsing onto 64 are arithmetic predictions; matching them exactly is

@@ -1,19 +1,23 @@
 # Working rules for this repo (Loom simulation, branch `loom-sim`)
 
-Start here when resuming: `examples/loom/CHECKPOINT.md` (project state),
-`examples/loom/HANDOFF-EVAL-REVIEW.md` (2026-08 evaluation-review session:
-verdicts, integrity findings, decisions, phased implementation plan A–D —
-the current work queue), `examples/loom/CODE-MAP.md` (what every piece of
-code models; its result numbers are stale until the Phase-A rerun),
-`examples/loom/README.md` (how to run).
+Start here when resuming: `examples/loom/CHECKPOINT.md` — the single living
+state doc (section 5 results are GENERATED; 5a Phase-A findings; 5b the
+experiment catalog; 6 next steps; 8 code↔real-system correspondence;
+9 review verdicts and reviewer defenses). Then `examples/loom/README.md`
+(how to run), `ANALYTICAL-MODEL.md` (equations, constants, decisions
+ledger), `implementation-plan.md` (the Coyote testbed plan).
+CODE-MAP.md and HANDOFF-EVAL-REVIEW.md were folded into CHECKPOINT
+sections 8 and 9 and deleted on 2026-08-04.
 
 ## Standing rules (from the project owner)
 
-1. **With every commit that adds or changes anything, overwrite BOTH
-   `examples/loom/CODE-MAP.md` AND `examples/loom/CHECKPOINT.md` in place**
-   (bump their Last-updated dates). CODE-MAP = what was written and how it
-   corresponds to the real Loom system; CHECKPOINT = full project state for
-   session restart. Do not let either drift.
+1. **With every commit that adds or changes anything, overwrite
+   `examples/loom/CHECKPOINT.md` in place** (bump its Last-updated date) —
+   it is the one living state doc, so there is nothing to keep in sync
+   with it. **Never hand-write a result number into any doc**: rerun the
+   suite and `python3 examples/loom/summarize_results.py --write`, which
+   regenerates section 5 from `results/*.csv`. Hand-quoted numbers are
+   exactly how README/CODE-MAP drifted from the CSVs before.
 2. **No hand-authored application workloads.** Application traces come only
    from: the repo's shipped microbenchmark ETs, STG with published model
    dimensions (Mixtral 8x7B, GPT-3 175B — never invent dims), or captured
@@ -29,7 +33,7 @@ code models; its result numbers are stale until the Phase-A rerun),
    the lookup adder t_pipe_local, full t_pipe is remote-route only);
    equal-wires topology fairness with the shared-XPU-edge gap disclosed.
 5. **Honest reporting**: negative/parity results are recorded in commit
-   messages and CODE-MAP, never dropped. The paper claim is SM reclamation
+   messages and CHECKPOINT, never dropped. The paper claim is SM reclamation
    + bulk parity + latency/isolation/unification — not bulk speedup.
 6. Commit at regular intervals on `loom-sim`; **no Co-Authored-By lines**.
 7. Run experiments inside the Docker image `astra-sim:loom` (official
@@ -39,8 +43,8 @@ code models; its result numbers are stale until the Phase-A rerun),
    `loom-sim` branch. (Paper prose rules, for when asked: no em dashes,
    XPU terminology, tex is design ground truth: no GFA/token/tag/seq;
    wire = offset·op·len.)
-9. Paper-repo references in CODE-MAP/CHECKPOINT stay on `loom-sim` (they
+9. Paper-repo references in CHECKPOINT stay on `loom-sim` (they
    bind code to the design and enable session restart); when the repo must
    stand alone for submission, create a separate sanitized `artifact`
-   branch (strip CLAUDE.md/CHECKPOINT/CODE-MAP internals, squash history)
+   branch (strip CLAUDE.md/CHECKPOINT internals, squash history)
    rather than scrubbing the working branch.
