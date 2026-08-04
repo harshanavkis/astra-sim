@@ -2,7 +2,7 @@
 # Collective-benchmark matrix: traffic pattern x size x topology x system.
 # Workloads come from the repo's OWN microbenchmark generators
 # (examples/workload/microbenchmarks/generator_scripts).
-# CSV on stdout: topology,collective,size_mb,system,wall_cycles,exposed_comm
+# CSV on stdout: cluster,collective,size_mb,system,wall_cycles,exposed_comm
 set -e
 cd "$(dirname "$0")/../.."
 ROOT=$PWD
@@ -18,10 +18,24 @@ SIZES=${SIZES:-1 16 64}
 SUFFIX=${SUFFIX:-}
 # name racks xpus extra-args
 #
-# The grid is SCALE x COLLECTIVE x SIZE. There is exactly ONE physical
-# topology, [Switch, Switch], because that is what is deployed: scale-up is
-# a switch (NVSwitch/NVLink), scale-out is a switched Clos/rail-optimized
-# fabric. Two rows = 16 and 64 XPUs.
+# The grid is CLUSTER SIZE x COLLECTIVE x SIZE. There is exactly ONE
+# physical topology, [Switch, Switch], because that is what is deployed:
+# scale-up is a switch (NVSwitch/NVLink), scale-out is a switched
+# Clos/rail-optimized fabric.
+#
+# XPUs per rack is FIXED AT 8 - that is the deployed scale-up domain
+# (DGX/HGX; NVIDIA EOS is 576 nodes x 8), and GB200 NVL72 goes the other
+# way to 72. Never thin the rack to make Loom look better: a 4-GPU rack
+# models a machine nobody builds. The axis is RACK COUNT, because a
+# hierarchical collective puts more work on dim1 as the cluster widens,
+# and dim1 is the only dimension Loom changes.
+#
+# Scale matters enormously and used to be invisible (2026-08-04). At 64
+# GPUs, all_reduce 64 MB is a byte-identical tie (Loom = B1 = 909,088)
+# because ~99% of the bytes stay on dim0; at 256 GPUs the same cell is
+# +25.2%. Comparable work evaluates far larger still - NCCL EP on EOS is
+# 4,608 GPUs, DeepEP targets 64+ EP degree - so 64 GPUs sat in exactly the
+# regime where the scale-up/scale-out divide costs least.
 #
 # Removed on 2026-08-04:
 #  - `ring_tor` (--dim1-topology Ring): nobody deploys a ring of ToRs, and
@@ -41,10 +55,10 @@ SUFFIX=${SUFFIX:-}
 #    NICs per rack. NOTE: the intrinsic dim0/dim1 taper (64 vs 50 GB/s per
 #    XPU) is NOT oversubscription - those are the wire rates, and both
 #    systems pay them.
-TOPOS=("rack4x4 4 4" "rack8x8 8 8")
+CLUSTERS=("64gpu_8racks 8 8" "256gpu_32racks 32 8")
 
-echo "topology,collective,size_mb,system,wall_cycles,exposed_comm"
-for T in "${TOPOS[@]}"; do
+echo "cluster,collective,size_mb,system,wall_cycles,exposed_comm"
+for T in "${CLUSTERS[@]}"; do
   set -- $T; TNAME=$1; RACKS=$2; XPUS=$3; shift 3; EXTRA="$@"
   NPUS=$((RACKS * XPUS))
   python3 $GEN --mode loom     --racks $RACKS --xpus-per-rack $XPUS $EXTRA -o /tmp/net_loom.yml

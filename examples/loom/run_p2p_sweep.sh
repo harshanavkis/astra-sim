@@ -22,7 +22,8 @@
 # that same plain store; without the flag B2 is 8472 too. The in-rack rows
 # are therefore a reference FLOOR (same binary, same store, routed locally
 # instead of across racks = the location-transparency result) and the sim
-# twin of hardware T1/M3 - never a win over a baseline. 2 racks x 4 XPUs: ranks 0-3 = rack 0, 4-7 = rack 1.
+# twin of hardware T1/M3 - never a win over a baseline. 2 racks x 8 XPUs (the deployed scale-up domain): ranks 0-7 = rack 0,
+# 8-15 = rack 1.
 # CSV on stdout: route,size_kb,system,wall_cycles
 set -e
 cd "$(dirname "$0")/../.."
@@ -37,18 +38,18 @@ PAT=$ROOT/examples/loom/workload/gen_p2p_patterns.py
 SIZES=${SIZES:-4 16 64 256 1024 4096 16384 65536 262144 1048576}
 ITERS=${ITERS:-8}
 
-python3 $GEN --mode loom     --racks 2 --xpus-per-rack 4 -o /tmp/net_p2p_loom.yml
-python3 $GEN --mode baseline --racks 2 --xpus-per-rack 4 -o /tmp/net_p2p_b1.yml
-python3 $GEN --mode baseline --racks 2 --xpus-per-rack 4 --rdma-init-ns 2800 \
+python3 $GEN --mode loom     --racks 2 --xpus-per-rack 8 -o /tmp/net_p2p_loom.yml
+python3 $GEN --mode baseline --racks 2 --xpus-per-rack 8 -o /tmp/net_p2p_b1.yml
+python3 $GEN --mode baseline --racks 2 --xpus-per-rack 8 --rdma-init-ns 2800 \
     -o /tmp/net_p2p_b2.yml
 
 echo "route,size_kb,system,wall_cycles"
 for ROUTE in in_rack cross_rack; do
   # in-rack stays inside rack 0 (dim0 only); cross-rack crosses to rack 1
-  [ "$ROUTE" = "in_rack" ] && DST=1 || DST=4
+  [ "$ROUTE" = "in_rack" ] && DST=1 || DST=8
   for S in $SIZES; do
     WL=/tmp/p2p_${ROUTE}_${S}
-    python3 $PAT --pattern single --racks 2 --xpus-per-rack 4 \
+    python3 $PAT --pattern single --racks 2 --xpus-per-rack 8 \
         --src 0 --dst $DST --size-kb $S --iters $ITERS --out $WL >/dev/null
     for SYS in "loom loom.json /tmp/net_p2p_loom.yml" \
                "b1_gpu_rdma baseline_gpu_rdma.json /tmp/net_p2p_b1.yml" \

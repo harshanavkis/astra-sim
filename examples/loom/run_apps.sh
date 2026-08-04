@@ -14,10 +14,22 @@ examples/loom/fetch_stg.sh >/dev/null 2>&1
 SUFFIX=${SUFFIX:-}
 
 # app kind ranks racks xpus stg-overrides...
-CFGS=("mixtral_moe moe 16 4 4"
+#
+# XPUs per rack is FIXED AT 8 - the deployed scale-up domain (DGX/HGX;
+# NVIDIA EOS is 576 nodes x 8). The 16- and 32-rank rows used to be 4x4 and
+# 8x4, i.e. 4-GPU racks, which no one builds and which under-exercised dim1
+# (the only dimension Loom changes). Scale is now carried by RACK COUNT.
+# The 256-GPU rows matter most: at 64 GPUs a hierarchical collective keeps
+# ~99% of its bytes on dim0, so the divide barely shows (2026-08-04).
+# Rank count must equal dp*tp*pp*ep. NOTE: pp cannot exceed the preset's
+# --num_stacks (4), or STG's convert_chakra asserts - dense 256 therefore
+# scales dp (dp16 tp4 pp4), not pp.
+CFGS=("mixtral_moe moe 16 2 8"
       "mixtral_moe moe 64 8 8 --dp 2 --tp 4 --ep 8"
-      "gpt3_dense dense 32 8 4"
-      "gpt3_dense dense 64 8 8 --dp 4 --tp 4 --pp 4")
+      "mixtral_moe moe 256 32 8 --dp 8 --tp 4 --ep 8"
+      "gpt3_dense dense 32 4 8"
+      "gpt3_dense dense 64 8 8 --dp 4 --tp 4 --pp 4"
+      "gpt3_dense dense 256 32 8 --dp 16 --tp 4 --pp 4")
 
 echo "app,ranks,system,wall_cycles,exposed_comm"
 for CFG in "${CFGS[@]}"; do

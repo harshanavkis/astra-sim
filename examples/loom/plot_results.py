@@ -127,22 +127,22 @@ def plot_matrix():
     rows = read("matrix.csv")
     if not rows:
         return
-    topos = sorted({r["topology"] for r in rows})
+    clusters = sorted({r["cluster"] for r in rows}, key=lambda c: int(c.split("gpu")[0]))
     colls = sorted({r["collective"] for r in rows})
     # every size present, not one hard-coded slice: the size dependence IS
     # the result (gain shrinks as buffers grow), and a single-size grid hid
     # both the small-message wins and the negative large-message cells.
     sizes = sorted({r["size_mb"] for r in rows}, key=int)
-    fig, axes = plt.subplots(len(sizes), len(topos),
-                             figsize=(3 * len(topos), 2.8 * len(sizes)),
+    fig, axes = plt.subplots(len(sizes), len(clusters),
+                             figsize=(3 * len(clusters), 2.8 * len(sizes)),
                              sharey="row", squeeze=False)
     for i, size in enumerate(sizes):
-        for j, topo in enumerate(topos):
+        for j, topo in enumerate(clusters):
             ax = axes[i][j]
             gains = []
             for c in colls:
                 sel = {r["system"]: int(r["wall_cycles"]) for r in rows
-                       if r["topology"] == topo and r["collective"] == c
+                       if r["cluster"] == topo and r["collective"] == c
                        and r["size_mb"] == size}
                 gains.append(100 * (sel["b1_gpu_rdma"] - sel["loom"]) / sel["b1_gpu_rdma"]
                              if "loom" in sel and "b1_gpu_rdma" in sel else 0)

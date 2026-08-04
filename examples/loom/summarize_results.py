@@ -83,7 +83,7 @@ def matrix_lines(csv_name="matrix.csv", label="Matrix"):
         return []
     cells = collections.defaultdict(dict)
     for r in rows:
-        cells[(r["topology"], r["collective"], r["size_mb"])][r["system"]] = \
+        cells[(r["cluster"], r["collective"], r["size_mb"])][r["system"]] = \
             int(r["wall_cycles"])
     per_size = collections.defaultdict(list)
     negatives = []
