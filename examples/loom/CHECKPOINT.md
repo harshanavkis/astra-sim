@@ -165,6 +165,33 @@ root = working rules. Result numbers are generated into section 5 by
 ## results/*.csv - do not hand-edit inside the markers)
 
 - Smoke (`smoke.csv`, 4-NPU 1 MB all-to-all): b3_ideal_rdma 10195 < loom 14723 < b1_gpu_rdma 20105 < b2_cpu_proxy 36744. Loom vs B1 **+26.77%**.
+- P2P sweep (`p2p_sweep.csv`, M2) - one send/recv pair, the only experiment with no collective chunk-overlap to hide per-operation cost, hence the cleanest read on the constant the headline depends on:
+
+| route | size | Loom vs B1 | Loom vs B2 |
+|---|---|---|---|
+| cross_rack | 4 KB | +45.2% | +75.9% |
+| cross_rack | 16 KB | +43.5% | +74.6% |
+| cross_rack | 64 KB | +37.7% | +69.8% |
+| cross_rack | 256 KB | +24.5% | +55.5% |
+| cross_rack | 1 MB | +10.1% | +30.4% |
+| cross_rack | 4 MB | +2.8% | +10.7% |
+| cross_rack | 16 MB | +0.5% | +2.8% |
+| cross_rack | 64 MB | -0.1% | +0.5% |
+| cross_rack | 256 MB | -0.3% | -0.1% |
+| cross_rack | 1024 MB | -0.3% | -0.3% |
+| in_rack | 4 KB | -9.4% | +46.8% |
+| in_rack | 16 KB | -8.1% | +43.2% |
+| in_rack | 64 KB | -5.1% | +33.2% |
+| in_rack | 256 KB | -2.1% | +17.2% |
+| in_rack | 1 MB | -0.6% | +5.9% |
+| in_rack | 4 MB | -0.2% | +1.6% |
+| in_rack | 16 MB | -0.0% | +0.4% |
+| in_rack | 64 MB | -0.0% | +0.1% |
+| in_rack | 256 MB | -0.0% | +0.0% |
+| in_rack | 1024 MB | -0.0% | +0.0% |
+
+  Cross-rack crossover: Loom leads B1 up to 16 MB, then converges.
+
 - Read credits (`sweep_credits.csv`, caps 1-1048576): exact linear 1/N scaling from 325568 cycles. Uncapped row present and equal to the 64-credit row.
 - Break-even t_pipe (`sweep_tpipe.csv`) — STANDALONE, not in the default suite (optional reviewer-proofing; T3 will measure t_pipe): **3596 ns** (linear, 480 cycles/ns). Its durable use is showing the design tolerates a slow FPGA clock.
 - Regime map (`regime_map.csv`) — STANDALONE, not in the default suite; runs `--pipe-ns 500` so its Loom is NOT the Loom of the other experiments (see 5a.5). Rerun it before quoting:
@@ -267,6 +294,52 @@ matters:
    that STG's comm groups are size **1, 2 and 4 only**, where ring and
    direct coincide. Corollary worth stating before any scale claim: a
    "64-rank" STG app never runs a 64-rank collective.
+
+**THE 64 MB CELLS ARE TRANSPORT-INSENSITIVE, AND THE NEGATIVES ARE A
+SCHEDULING ARTIFACT (measured 2026-08-04). Read this before quoting or
+re-explaining any large-size cell - it has now been explained wrongly
+twice ("header tax", then "ring artifact").**
+
+At 64 MB, dim1 latency is hidden for BOTH systems while dim0 latency is
+charged in full to both. all_reduce 64 MB, rack8x8, wall cycles:
+
+| knob | sweep -> wall cycles |
+|---|---|
+| B1 `rdma_init` (dim1) | 0 -> 909,088 · **2400 -> 909,088** · 5000 -> 918,923 · 8000 -> 1,083,612 |
+| Loom dim1 latency | 1625 -> 911,888 · **3425 -> 911,888** · 9425 -> 1,131,688 |
+| Loom `t_pipe_local` (dim0) | 0 -> 909,088 · 50 -> 911,888 · 200 -> 920,288 (exactly 56x the adder) |
+
+So B1 is COMPLETELY INSENSITIVE to `rdma_init` below ~3-4 us, and Loom is
+equally insensitive on dim1. The asymmetry is dim0-vs-dim1, not
+Loom-vs-baseline: both sides' transport differences are erased, and only
+Loom's in-rack lookup survives on the books. **The −0.31% therefore does
+not mean "Loom is slower" - that cell measures dim0 and bandwidth only.**
+Note the sensitivity is per-collective: reduce_scatter at the same size IS
+sensitive (2400 ns -> +33,600 cycles = 2400 x 14 steps).
+
+**The hiding is caused by `active-chunks-per-dimension: 2`** in every
+`system/*.json`, and raising it both removes the hiding and flips the
+cell:
+
+| active-chunks | B1 rdma_init delta (0 vs 2400) | Loom | B1 | gain |
+|---|---|---|---|---|
+| 1 | 0 | — | 1,818,176 | — |
+| **2 (current)** | **0** | 911,888 | 909,088 | **−0.31%** |
+| 4 | +67,200 | 575,416 | 612,278 | **+6.02%** |
+| 8 | +80,808 | 575,416 | 612,278 | **+6.02%** |
+
+Two consequences. (1) The current value understates Loom: it suppresses
+exactly the per-operation cost Loom eliminates, and it also runs ~3.7x
+slower in absolute terms than the model's best. (2) Every negative cell in
+the matrix is an artifact of this parameter, not a property of Loom.
+
+**OPEN DECISION (owner): what should `active-chunks-per-dimension` be?**
+Real NCCL pipelines many chunks per collective, so 2 looks conservative to
+the point of being unrepresentative - but raising it moves EVERY result,
+apps included, so it is not a change to make silently. Whatever is chosen
+must be justified in prose and applied identically to all systems. Until
+then, do not cite any 64 MB cell as evidence about transport in either
+direction.
 
 **Audit findings against the catalog (2026-08-04), still open:**
 
