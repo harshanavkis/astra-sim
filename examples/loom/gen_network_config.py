@@ -7,7 +7,7 @@ dim1 = inter-ToR Ethernet
 The Loom switch is modeled as constants folded into the existing per-dimension
 `latency` and `bandwidth` fields (the HGX-H100-validated.yml technique):
   - dim latency  += pipe_ns          (switch pipeline: validate/match/bounds/translate)
-  - dim1 bandwidth *= goodput        (encap header + coalescing efficiency)
+  - dim1 bandwidth *= goodput        (wire efficiency; see --loom-goodput)
 
 Modes:
   loom      pipe adder on both dims (every hop crosses the ToR datapath);
@@ -126,8 +126,17 @@ def main():
                    help="OVERRIDE local-route adder "
                         "(= t_lookup + t_translate + t_forward = 50 by "
                         "default); testbed T3 vs raw Coyote forwarding")
-    p.add_argument("--loom-goodput", type=float, default=0.947,
-                   help="Loom encap goodput factor at the run's message mix")
+    p.add_argument("--loom-goodput", type=float, default=0.95,
+                   help="Loom goodput factor at the run's message mix. Equal to "
+                        "--roce-goodput by default because BULK Loom traffic is "
+                        "an ordinary RDMA WRITE: offset/op/len ride in RDMA's "
+                        "own BTH/RETH, so there are NO extra wire bytes (see "
+                        "the Coyote prototype HW-DESIGN.md). The old 0.947 "
+                        "assumed a separate 12 B header that the "
+                        "implementation does not send. Real Loom overhead is "
+                        "size-dependent and lives BELOW 64 B, where a sub-64 B "
+                        "store is padded into a 64 B inline envelope; that is "
+                        "the T2 coalescing curve, not a flat factor.")
     p.add_argument("--roce-goodput", type=float, default=0.95,
                    help="baseline RoCE goodput factor")
     p.add_argument("--roce-stack-ns", type=float, default=150.0,

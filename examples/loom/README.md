@@ -14,7 +14,7 @@ knobs** — the same technique the in-repo `HGX-H100-validated.yml` uses (its
 | Loom / baseline feature | ASTRA-sim mechanism (existing) |
 |---|---|
 | Switch pipeline latency (per-stage: lookup/queue/encap/roce/translate/forward, one param per hw-controller block) | folded into per-dimension `latency` (network YAML) |
-| Encapsulation goodput (3-field header + coalescing efficiency at the run's message-size mix) | folded into per-dimension `bandwidth` |
+| Wire goodput (bulk = plain RoCE framing; sub-64 B envelope + coalescing) | folded into per-dimension `bandwidth` |
 | Posted-write source-local completion | eager mode (default; sender completes at injection) |
 | Baseline RDMA large-message handshake | `--rendezvous-protocol true` (existing CLI flag) |
 | Per-message endpoint cost (GPU doorbell/QP kernel, CPU proxy post+poll) | `endpoint-delay` (system JSON) |
@@ -170,7 +170,7 @@ classes); only the hardware runs remain to fill this table.
 | `--roce-stack-ns` | QP Router + RoCEv2 engine per side (RX incl. RX Decapsulator) | 150 ns | Coyote RoCE RC ping-pong floor |
 | `--t-translate` | Transaction Generator (Bounds Checker + Address Translation) | 15 ns | T3, stage counter |
 | `--t-forward` | Local Forward Engine egress | 10 ns | T3, stage counter |
-| Loom goodput vs message size (coalescing curve) | TX Encapsulator coalescer | 0.947 flat (header math only; coalescing benefit deliberately unmodeled) | T2 curve, coalescer on/off |
+| Loom goodput vs message size (coalescing curve) | TX Encapsulator coalescer | 0.95 flat = identical to RoCE (bulk adds no wire bytes); the real, size-dependent overhead is the sub-64 B envelope, deliberately unmodeled | T2 curve, coalescer on/off |
 | read RTT + credit behavior | Read Credit Tracker | remote-mem-latency 5000 ns | T6 |
 | B2 rdma-init | (baseline, same hosts) | 2800 ns | testbed CPU-verbs post+poll run |
 | substrate floors (fabric store latency, DMA BW, RoCE ping-pong) | — | fabric 500 ns etc. | Phase 0 floors; every Loom number reported as overhead over these |
@@ -191,7 +191,7 @@ lookup — the connection identifies the binding).
 | B1 rdma-init (dim1 only) | 2400 ns | from ≈3 µs end-to-end GPU-initiated put: NVIDIA Developer Blog on IBGDA/GPUDirect Async (2022) + NVSHMEM performance docs; swept |
 | B2 rdma-init components | 2800 ns | ib_write_lat ≈1.6–2 µs: NVIDIA/Mellanox `perftest` suite (ConnectX-6/7 class); WQE/doorbell costs: Kalia, Kaminsky, Andersen, "Design Guidelines for High Performance RDMA Systems", USENIX ATC 2016; proxy handoff: NCCL net-proxy path |
 | RoCE goodput | 0.95 | computed: Eth+IP+UDP+BTH ≈78 B headers on 4 KB MTU (RoCEv2 framing, InfiniBand spec Annex A17) |
-| Loom goodput | 0.947 | computed: RoCE goodput × 4096/4108 (12 B ⟨offset·op·len⟩ header, paper design §6.2) |
+| Loom goodput (bulk) | 0.95 | **= RoCE goodput.** Bulk Loom traffic is an ordinary RDMA WRITE: ⟨offset·op·len⟩ rides in RDMA's own BTH/RETH, so no extra wire bytes (Coyote `HW-DESIGN.md`). CORRECTED 2026-08-04 — the previous 0.947 assumed a separate 12 B header (RoCE × 4096/4108) that the implementation does not send. Sub-64 B stores DO pay a 64 B inline envelope, but that is a size-dependent curve owned by T2, not a flat factor. |
 | B1 SM reservation | 20 of 132 SMs | DeepSeek-AI, "DeepSeek-V3 Technical Report", arXiv:2412.19437; swept {8, 20, 32} |
 | workload shapes | Mixtral 8x7B / GPT-3 175B | Jiang et al., arXiv:2401.04088 / Brown et al., "Language Models are Few-Shot Learners", NeurIPS 2020 |
 | `--uplink-oversub` | 1.0 (equal wires) | fairness choice (ours); swept |
