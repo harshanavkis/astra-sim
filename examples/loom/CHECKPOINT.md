@@ -598,6 +598,42 @@ which is the right direction to be wrong in.
 NOTE for related work: Enfabrica ACF-S is the closest commercial design to
 Loom and is not yet cited.
 
+**APP RANK PLACEMENT IS CORRECT - CHECKED, NOT ASSUMED (2026-08-04).**
+Topology is `[8 xpus, 8 racks]`, so rank r lives in rack r//8. Comm-group
+membership from the STG-generated group JSONs:
+- **mixtral (MoE) is placed exactly right.** The 8 EP groups are
+  `{0,8,16,24,32,40,48,56}`-shaped, spanning ALL 8 racks - the EP
+  all-to-all crosses dim1, which is where Loom helps - while TP (`{0,2,4,6}`)
+  and DP (`{0,1}`) stay in-rack. That is how it would be deployed.
+- **gpt3 (dense) collectives are size-4 groups spanning 1-2 racks**, mostly
+  in-rack, which raised the worry that its ~0% comm gain is a placement
+  artifact. **It is not.** Forcing more cross-rack traffic makes it WORSE:
+  `dp16 tp4 pp1` puts 20/20 groups across up to 4 racks and gives comm
+  **+0.55%**, against `dp4 tp4 pp4`'s 16/32 cross-rack and **+3.80%**
+  (`dp8 tp8 pp1`: 8/16 cross-rack, +2.79%). A DP-16 gradient all-reduce on
+  a 175B model is enormous, so it is bandwidth-bound wherever it is placed.
+  Dense is genuinely bandwidth-bound; the placement is fine and realistic
+  (TP belongs in the scale-up domain).
+
+**REAL CAPTURED TRACES - ACCESS PATH (catalog A3, found 2026-08-04).**
+The MLCommons **Chakra Open Trace Library** exists and carries exactly the
+workloads this evaluation wants: **GPT-3, Llama, Mixtral and DeepSeek-MoE**,
+captured on production-scale GPU infrastructure by Georgia Tech's AI
+Makerspace with HPE, across diverse parallelization strategies.
+- Tools/format: `https://github.com/mlcommons/chakra` (public).
+- Traces: a Google Drive folder,
+  `https://drive.google.com/drive/folders/13Ojg7fLGONj5_YpYLXBKPU630PdfeFoo`,
+  **restricted to approved WG members**.
+- To get in: subscribe at `https://mlcommons.org/community/subscribe/`
+  indicating the Chakra Working Group, associate a Google account with an
+  organisational email, then the Drive folder and meeting invites follow.
+  Discord `https://discord.gg/g6KUH6WvMa`; WG meets Mondays 11:05 PT.
+- Paper: arXiv:2605.11333 (MLSys 2026).
+**This is the long-lead item on the whole plan - membership approval is
+not instant. Start it before any further sim work.** DeepSeek-MoE is the
+anchor trace (the motivating workload); pair it with one dense LLM so
+"no bulk regression" has real-trace support.
+
 **Audit findings against the catalog (2026-08-04), still open:**
 
 5. **The regime map (A4) and the t_pipe sweep are OUT of the default
