@@ -309,8 +309,16 @@ def domain_lines():
             cells.append(f"{gain(v['b1_gpu_rdma'], v['loom']):+.2f}%"
                          if v and "loom" in v and "b1_gpu_rdma" in v else "-")
         out.append(f"| {m} | {r} | " + " | ".join(cells) + " |")
-    out += ["", "  Read this honestly: at a FIXED cluster size, NVL72-class "
-                "racks erase Loom's benefit almost entirely. The cause is rack "
+    out += ["", "  Bounds which argument carries the paper in which "
+                "deployment; it is NOT a refutation. SM reclamation is "
+                "topology-INDEPENDENT (measured +10.72% compute gain at both "
+                "8 GPUs/rack x 32 racks and 64 GPUs/rack x 4 racks), Loom is "
+                "never worse than B1 (the floor is parity, since crossing the "
+                "network costs every system the same), and the removal of QPs/"
+                "keys/buffers from the accelerator is not modelled here at all "
+                "(catalog A9). What shrinks is the communication differential. "
+                "At a FIXED cluster size, NVL72-class "
+                "racks erase that differential almost entirely. The cause is rack "
                 "COUNT (576 GPUs in 72-GPU racks is only 8 racks, inside the "
                 "regime where dim1 latency is hidden), which is the same "
                 "mechanism as the scale sweep. The defence is that NVL72 "

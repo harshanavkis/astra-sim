@@ -214,7 +214,7 @@ root = working rules. Result numbers are generated into section 5 by
 | 36 | 16 | +37.83% | +0.00% | +17.54% | +2.56% |
 | 72 | 8 | +5.47% | +0.00% | +1.38% | +0.33% |
 
-  Read this honestly: at a FIXED cluster size, NVL72-class racks erase Loom's benefit almost entirely. The cause is rack COUNT (576 GPUs in 72-GPU racks is only 8 racks, inside the regime where dim1 latency is hidden), which is the same mechanism as the scale sweep. The defence is that NVL72 deployments are correspondingly LARGER, so rack count - and with it the cross-domain traffic fraction - recovers. That defence is NOT yet demonstrated: simulating 72-GPU racks beyond ~576 GPUs did not complete here, so it needs the validated analytical proxy (catalog B7/A5).
+  Bounds which argument carries the paper in which deployment; it is NOT a refutation. SM reclamation is topology-INDEPENDENT (measured +10.72% compute gain at both 8 GPUs/rack x 32 racks and 64 GPUs/rack x 4 racks), Loom is never worse than B1 (the floor is parity, since crossing the network costs every system the same), and the removal of QPs/keys/buffers from the accelerator is not modelled here at all (catalog A9). What shrinks is the communication differential. At a FIXED cluster size, NVL72-class racks erase that differential almost entirely. The cause is rack COUNT (576 GPUs in 72-GPU racks is only 8 racks, inside the regime where dim1 latency is hidden), which is the same mechanism as the scale sweep. The defence is that NVL72 deployments are correspondingly LARGER, so rack count - and with it the cross-domain traffic fraction - recovers. That defence is NOT yet demonstrated: simulating 72-GPU racks beyond ~576 GPUs did not complete here, so it needs the validated analytical proxy (catalog B7/A5).
 
 - Break-even t_pipe (`sweep_tpipe.csv`) — STANDALONE, not in the default suite (optional reviewer-proofing; T3 will measure t_pipe): **3596 ns** (linear, 480 cycles/ns). Its durable use is showing the design tolerates a slow FPGA clock.
 - Regime map (`regime_map.csv`) — STANDALONE, not in the default suite; runs `--pipe-ns 500` so its Loom is NOT the Loom of the other experiments (see 5a.5). Rerun it before quoting:
@@ -393,8 +393,7 @@ setup, in the regime where the divide costs least.
   design. Say this in the paper rather than letting a reader see a scaling
   failure.
 
-**THE NVL72 THREAT IS NOW MEASURED, AND IT IS SERIOUS
-(`run_domain_sweep.sh`, 2026-08-04).** Holding the cluster at 576 GPUs and
+**THE NVL72 TREND, MEASURED (`run_domain_sweep.sh`, 2026-08-04).** Holding the cluster at 576 GPUs and
 growing the scale-up domain:
 
 | GPUs/rack | racks | ar 1 MB | ar 64 MB | a2a 1 MB | a2a 64 MB |
@@ -403,9 +402,33 @@ growing the scale-up domain:
 | 36 (NVL36) | 16 | +37.83% | +0.00% | +17.54% | +2.56% |
 | **72 (NVL72)** | **8** | **+5.47%** | **+0.00%** | **+1.38%** | **+0.33%** |
 
-At a fixed cluster size, NVL72-class racks erase Loom's benefit almost
-entirely - including at 1 MB, where it drops from +45% to +5%. This is the
-single strongest argument against the paper and must appear in it.
+At a fixed cluster size, NVL72-class racks erase the COMMUNICATION
+differential almost entirely - including at 1 MB, where it drops from +45%
+to +5%.
+
+**DO NOT over-read this as "the strongest argument against the paper"
+(an earlier version of this note did, wrongly - owner correction
+2026-08-04). Three things bound the damage:**
+1. **SM reclamation is topology-INDEPENDENT.** Measured on mixtral-256
+   with the roofline configs: the compute gain is **+10.72% at 8 GPUs/rack
+   x 32 racks AND +10.72% at 64 GPUs/rack x 4 racks** - byte-identical. It
+   is a property of the endpoint model, not the network. What changes is
+   its WEIGHT in wall time (that workload is ~91-94% exposed comm, so
+   +10.72% of compute buys +0.79% wall at 4 racks vs +18.68% at 32).
+2. **Loom is never WORSE - the floor is parity.** The sweep shows a
+   shrinking differential, not a loss. The cross-rack cost is inherent to
+   crossing the network; every system pays it, and a bigger scale-up
+   domain helps everyone equally.
+3. **The state argument is untouched and unmodelled**: no QPs, keys or
+   transport buffers on the accelerator. The simulator cannot show this at
+   all; catalog A9 (QP accounting) is its quantitative form.
+
+So the correct reading is that this sweep BOUNDS WHICH ARGUMENT CARRIES
+THE PAPER IN WHICH DEPLOYMENT, and it lands exactly on the settled
+positioning: many small racks -> the communication win leads; few large
+racks -> SM reclamation + unification + state removal lead, with
+communication at parity. That is "NOT a bulk-speedup paper" restated
+quantitatively, not a refutation of it.
 
 The cause is the same mechanism as everywhere else: rack COUNT. 576 GPUs
 in 72-GPU racks is only 8 racks, and 71 of any rank's 575 peers are
