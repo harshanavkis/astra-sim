@@ -317,11 +317,37 @@ term is now equal (both 47.5 GB/s since the goodput fix) and the latency
 term (Loom 1615 vs B1 3000 ns) is pipelined away by concurrent chunks -
 latency overlaps, bandwidth serializes.
 
-**Consequence: both matrix shapes (4x4 and 8x8) are rack-heavy, so the
-grid is biased against Loom and its 64 MB column largely measures the rack
-fabric.** The grid axis that matters for Loom is the RACKS : XPUS-PER-RACK
-ratio, not total scale. OPEN: add a wide shape (e.g. 16x4) so dim1 is
-actually exercised; decide whether to replace 4x4/8x8 or add to them.
+**Consequence: the 64 MB column largely measures the rack fabric, which is
+identical for both systems by construction.** But the fix is NOT to reshape
+the racks. 8 GPUs per scale-up domain is exactly what is deployed (DGX/HGX;
+NVIDIA EOS is 576 nodes x 8), and GB200 NVL72 goes the other way to 72 - a
+4-GPU rack would be modelling a machine nobody builds, i.e. the `ring_tor`
+mistake again, this time in Loom's favour.
+
+**THE REAL PROBLEM IS CLUSTER SIZE: we evaluate 64 GPUs in 8 racks.**
+Holding the realistic 8 XPUs/rack and scaling the RACK COUNT (all_reduce
+64 MB):
+
+| cluster | Loom | B1 | gain |
+|---|---|---|---|
+| 8 racks (64 GPUs) - the current grid | 909,088 | 909,088 | **+0.00%** |
+| 16 racks (128 GPUs) | 909,088 | 972,814 | **+6.55%** |
+| 32 racks (256 GPUs) | 1,019,074 | 1,362,554 | **+25.21%** |
+
+Loom's benefit grows with rack count, because a hierarchical collective
+puts more work on dim1 as the cluster widens - and dim1 is the only
+dimension Loom changes. Comparable work evaluates far larger: NCCL EP on
+EOS (576 nodes x 8 GPUs = 4,608), DeepEP at 64+ EP degree, NVIDIA Wide-EP
+on GB200 NVL72. At 64 GPUs we are ~1/70th of the smallest comparable
+setup, in the regime where the divide costs least.
+
+**OPEN (owner): raise the grid scale.** Recommend 8 XPUs/rack fixed, racks
+{8, 32} = 64 and 256 GPUs, so scale is an explicit axis and the regime
+dependence is shown rather than hidden. This moves every matrix and apps
+number. Counter-argument to address in prose either way: NVL72-class
+racks enlarge the scale-up domain and shrink cross-rack traffic - Loom's
+answer is that racks still must talk at cluster scale, which is exactly
+what the rack-count sweep shows.
 
 **HOW THE all_reduce 64 MB CELL WENT FROM -0.31% TO +0.000% (2026-08-04).**
 It did not get better - it became a TIE, and the tie is forced. The
