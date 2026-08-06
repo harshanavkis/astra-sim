@@ -598,6 +598,62 @@ which is the right direction to be wrong in.
 NOTE for related work: Enfabrica ACF-S is the closest commercial design to
 Loom and is not yet cited.
 
+**THE WHOLE COLLECTIVE EVALUATION IS ONE NUMBER - READ THIS FIRST
+(derived and validated 2026-08-04). It explains every matrix, scale and
+apps result, and it identifies the single measurement the paper depends
+on.**
+
+Loom and B1 differ in EXACTLY ONE place: dim1 latency, **1615 ns vs
+3000 ns**. dim0 is identical (500 ns) and both dim1 bandwidths are
+47.5 GB/s. Therefore:
+
+    gain = 1385 ns x (exposed cross-rack traversals) / B1_total
+
+Validated against the CSVs, exact to two decimals:
+
+| cell | exposed | predicted | actual |
+|---|---|---|---|
+| 64 GPU all_reduce 1 MB | 56 | 40.48% | 40.48% |
+| 64 GPU all_reduce 64 MB | 0 | 0.00% | 0.00% |
+| 256 GPU all_reduce 1 MB | 248 | 44.68% | 44.68% |
+| 256 GPU all_reduce 64 MB | 248 | 25.21% | 25.21% |
+
+"Exposed traversals" is measured directly as `d(wall)/d(dim1 latency)`,
+by sweeping `--rdma-init-ns` and taking the slope. It equals
+`2(racks-1) x preferred-dataset-splits` - 2*7*4=56 at 8 racks,
+2*31*4=248 at 32 - WHEN the latency is exposed at all. Chunk pipelining
+hides it below a threshold: at 64 GPUs/64 MB the slope is exactly 0 (all
+56 hidden, threshold ~3.4 us); at 256 GPUs/64 MB the slope goes
+16 -> 242 -> 248 across 600 ns steps, because more racks means thinner
+per-step chunks and therefore less hiding capacity (threshold ~1.2 us).
+
+So the MATRIX varies through the denominator (56 traversals is 40% of a
+1 MB collective, 8% of a 64 MB one, and 0% when hidden) and the SCALE
+sweep varies through the numerator (56 -> 248 traversals) plus the falling
+hiding threshold. Both are the same formula.
+
+**WHY DENSE IS LOW: 177x fewer cross-rack operations.** Measured as
+`d(exposed_comm)/d(rdma_init)`: a Mixtral iteration has **2128** exposed
+cross-rack traversals; a GPT-3 iteration has **12**. Dense training is a
+handful of enormous DP gradient all-reduces - huge messages, few
+operations, latency amortised to nothing - while MoE is EP all-to-all
+dispatch/combine, thousands of small cross-rack messages each paying full
+initiation. Loom removes a PER-OPERATION cost, so its benefit is
+proportional to operation count. This is not a placement artifact (see
+below) and not a modelling error; it is the claim.
+
+**THE LOAD-BEARING CONSEQUENCE.** Every collective number scales linearly
+with `rdma_init - 1015 ns`, where 1015 ns is Loom's own dim1 adder above
+the 600 ns wire:
+- `rdma_init` = 2400 (the current, UNMEASURED placeholder) -> 1385 ns
+  saved -> the results as they stand;
+- `rdma_init` = **1015 -> Loom's collective benefit is EXACTLY ZERO**;
+- `rdma_init` < 1015 -> **Loom is SLOWER on every collective**.
+The break-even sits uncomfortably close to plausible IBGDA figures, so
+Phase C's measurement of `rdma_init` is the single most load-bearing
+number in the evaluation - more so than any FPGA constant, since t_pipe
+only moves the 1015 ns side of that subtraction.
+
 **APP RANK PLACEMENT IS CORRECT - CHECKED, NOT ASSUMED (2026-08-04).**
 Topology is `[8 xpus, 8 racks]`, so rank r lives in rack r//8. Comm-group
 membership from the STG-generated group JSONs:
