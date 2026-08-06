@@ -686,7 +686,32 @@ one-way is ~7.5 us; minus the 600 ns wire that is ~6.9 us of per-op cost,
 roughly 3x the 2400 ns placeholder. Effect on mixtral-64: 2400 -> +15.27%,
 4000 -> +27.13%, 5000 -> +33.01%, 6900 -> **+41.90%**.
 
-Caveats before quoting any of this: these are NVSHMEM API-level latencies
+**METHODOLOGICAL WARNING - 6900 IS NOT A CLEAN rdma_init (owner point,
+2026-08-04). Do not quote it as one.** Loom's 1615 ns is a CONSTRUCTED SUM
+with each component placed deliberately (edge legs 500 + wire 600 +
+pipeline 200 + RoCE 150x2 + translate 15). 6900 is a BLACK BOX MINUS ONE
+TERM: an end-to-end NVSHMEM put latency with only OUR ASSUMED 600 ns wire
+subtracted, everything remaining attributed to "initiation". Those are not
+the same quantity. Three concrete problems:
+1. **Their wire is not our wire.** The 7.5 us was measured on hardware
+   whose switch/cable latency may be 1-2 us. Subtracting 600 leaves the
+   remainder inside `rdma_init`, so the model would charge B1 for wire
+   TWICE - once in the 600 ns dim1 term, again hidden inside 6900.
+2. **It includes NVSHMEM library overhead** - fair if the baseline is "how
+   DeepEP actually does it", unfair if it is "GPU-initiated RDMA in
+   principle". Loom's path is a store instruction with no library, so
+   nothing comparable sits on its side.
+3. **It may include remote completion semantics** that the one-way latency
+   term does not model.
+So treat the pair as a BRACKET, not a measurement: **2400 ns** =
+literature-derived, intended to isolate initiation, conservative;
+**~6900 ns** = upper bound attributing all non-wire cost to B1. The true
+value is unknown until B1 is decomposed with the same discipline as Loom's
+side - which is what Phase C must do: measure the COMPONENTS (doorbell ->
+WQE fetch over PCIe, NIC processing, payload fetch from HBM, wire, remote
+delivery), not one end-to-end number.
+
+Further caveats: these are NVSHMEM API-level latencies
 (library overhead included - though Loom's path is a plain store, so it
 genuinely avoids that layer); a 256 B scalar put is the smallest possible
 operation and larger ops amortise; hardware and measurement methodology
