@@ -668,7 +668,36 @@ GPU-side path. That is structurally hard, not marginal. (An earlier version
 of this note called the break-even "uncomfortably close to plausible IBGDA
 figures" - that was alarmist and is retracted.)
 
-**The real risk is MAGNITUDE, not sign.** Gains scale as
+**LITERATURE SAYS 2400 IS TOO LOW - THE PLACEHOLDER IS CONSERVATIVE
+(searched 2026-08-04). This inverts the long-standing gain-attribution
+worry: measuring rdma_init will most likely move Loom's numbers UP.**
+
+| source | measurement | value |
+|---|---|---|
+| Demystifying NVSHMEM, arXiv:2606.05951 | IBGDA INTER-node scalar put, 256 B, one-way | **~7.5 us** |
+| same | INTRA-node scalar put/get (no NIC at all) | **1.3-2.2 us** |
+| GICC, arXiv:2604.22126 | NVSHMEM small message (4 B-1 KB) | 11.5-13.8 us |
+| DeepEP legacy.md (H800 + CX7 400G, 128 tok, 7168 hidden, top-8) | low-latency dispatch EP8 -> EP256 | 77 -> 194 us; combine 114 -> 360 us; RDMA BW falls 98 -> 39 GB/s |
+
+**The break-even is not reachable.** NVSHMEM's INTRA-node scalar put -
+which involves no NIC, no wire, no PCIe crossing to a NIC - is already
+1.3-2.2 us, above the entire 1015 ns break-even on its own. Inter-node
+one-way is ~7.5 us; minus the 600 ns wire that is ~6.9 us of per-op cost,
+roughly 3x the 2400 ns placeholder. Effect on mixtral-64: 2400 -> +15.27%,
+4000 -> +27.13%, 5000 -> +33.01%, 6900 -> **+41.90%**.
+
+Caveats before quoting any of this: these are NVSHMEM API-level latencies
+(library overhead included - though Loom's path is a plain store, so it
+genuinely avoids that layer); a 256 B scalar put is the smallest possible
+operation and larger ops amortise; hardware and measurement methodology
+differ across the three sources; and DeepEP's production kernels are more
+optimised than raw NVSHMEM. **KEEP 2400 as the default** - it is
+documented, literature-anchored and errs AGAINST Loom, which is the right
+direction to be wrong in - but stop describing it as a risk to the
+headline. Phase C should report the measured value with the wire excluded
+(see the protocol note below).
+
+**The residual risk is MAGNITUDE, not sign.** Gains scale as
 (rdma_init - 1015)/1385: 1500 ns -> **0.35x** current, 2000 -> 0.71x,
 2400 -> 1.00x, 2800 -> 1.29x. At an aggressive-IBGDA 1500 ns, mixtral-64
 goes +15.27% -> ~+5% and the matrix's +40% -> ~+14%. Loom still wins; the
