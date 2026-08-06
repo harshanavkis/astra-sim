@@ -697,6 +697,40 @@ direction to be wrong in - but stop describing it as a risk to the
 headline. Phase C should report the measured value with the wire excluded
 (see the protocol note below).
 
+**WHAT THIS MEANS FOR THE EXISTING BENCHMARKS - SOME CONCLUSIONS IN THIS
+SECTION ARE PLACEHOLDER ARTIFACTS.** The cells reading exactly +0.00% do so
+because 3000 ns (600 wire + 2400) sits BELOW the chunk-hiding threshold.
+Raise rdma_init to the literature-implied 6900 and most of them break.
+Measured, all_reduce 64 MB:
+
+| cell | rdma_init 2400 | rdma_init 6900 |
+|---|---|---|
+| 64 GPUs / 8 racks | +0.00% | **+11.05%** |
+| 256 GPUs / 32 racks | +25.21% | **+58.88%** |
+| NVL36, 576 GPUs / 16 racks | +0.00% | **+25.11%** |
+| NVL72, 576 GPUs / 8 racks | +0.00% | **+0.00%** |
+
+**Must be re-qualified as "at rdma_init = 2400" rather than stated flatly:**
+- "the 64 MB cells are transport-insensitive" - true at 2400, FALSE at 6900;
+- the exact-tie cells the summarizer flags - they are ties only at 2400;
+- "NVL36 erases the benefit" - false at 6900 (+25.11%).
+
+**ROBUST, survives the correction:**
+- **NVL72 at a fixed cluster size still erases the comm win** - still
+  +0.00% at 6900, because 8 racks of 72 GPUs give per-step chunks large
+  enough to hide even 7.5 us. The NVL72 threat is real, not an artifact.
+- **Dense is SM-reclamation-only**: 12 exposed traversals x 5885 ns is
+  ~0.1% of a 72.7 M-cycle iteration, so the dense story is structural and
+  rdma_init-independent.
+- **In-rack parity** - dim0 only, rdma_init never applies.
+- **SM reclamation** (+10.72%) - compute-side, unaffected.
+- **Read credits** - no dim1 involvement.
+
+**Every collective number in section 5 is therefore a LOWER BOUND**, and
+single-point reporting is fragile. Recommended: bracket the suite by
+rerunning at rdma_init 2400 AND ~6900 and reporting ranges, or make
+rdma_init an explicit axis the way scale and SM-count already are.
+
 **The residual risk is MAGNITUDE, not sign.** Gains scale as
 (rdma_init - 1015)/1385: 1500 ns -> **0.35x** current, 2000 -> 0.71x,
 2400 -> 1.00x, 2800 -> 1.29x. At an aggressive-IBGDA 1500 ns, mixtral-64
