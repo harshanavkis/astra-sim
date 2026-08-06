@@ -938,7 +938,34 @@ Jericho, 802.1Qcz, BFC); intro contribution 4 and eval summary dropped the
 isolation promise. Victim experiments (testbed T5 / Sim-V1) demoted to
 discussion-supporting demos.
 
-## 6. Next steps (priority order, revised 2026-07-27)
+## 6. Next steps (priority order; rdma_init status revised 2026-08-04)
+
+**STATUS OF THE CURRENT RESULTS - READ BEFORE QUOTING ANYTHING.**
+Robust and NOT dependent on `rdma_init`: SM reclamation (+10.72%,
+compute-side); dense being SM-reclamation-only (12 vs 2128 exposed
+traversals is workload structure); in-rack parity and read credits (never
+touch dim1); the formula `gain = (rdma_init - 1015) x exposed / total`
+with `exposed = 2(racks-1) x splits`; and every qualitative ORDERING (MoE
+> dense, small > large messages, more racks > fewer, NVL72 shrinks the
+differential) - all monotone in rdma_init, so they hold for any value
+above break-even.
+CONTINGENT: every absolute collective percentage, and WHICH cells read
+exactly +0.00% (threshold-dependent). Bracket [2400, ~6900] ~ 3x spread.
+**=> Report collective numbers as ranges or as "at rdma_init = 2400",
+never as bare measured values, until Phase C decomposes B1.**
+
+**WHEN rdma_init IS MEASURED, REVISIT (do not forget - this is why the
+bracket exists):**
+1. Rerun the whole suite and regenerate section 5.
+2. Re-check every "+0.00%" and "transport-insensitive" claim in 5a - most
+   are threshold artifacts of 2400 and will move.
+3. Re-check the NVL36 domain row (0.00% at 2400, +25.11% at 6900).
+4. The NVL72 row and the dense conclusion are expected to SURVIVE; if they
+   do not, the positioning changes and 5a must be rewritten.
+5. Decide whether rdma_init becomes a permanent reported axis (like scale
+   and SM count) rather than a single point.
+
+
 
 1. ~~**Data integrity**~~ **DONE 2026-08-04 (Phase A).** `run_smoke.sh`
    generates its configs (and B2 finally gets its own 2800 ns network
