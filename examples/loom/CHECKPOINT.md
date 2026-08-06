@@ -649,10 +649,38 @@ the 600 ns wire:
   saved -> the results as they stand;
 - `rdma_init` = **1015 -> Loom's collective benefit is EXACTLY ZERO**;
 - `rdma_init` < 1015 -> **Loom is SLOWER on every collective**.
-The break-even sits uncomfortably close to plausible IBGDA figures, so
-Phase C's measurement of `rdma_init` is the single most load-bearing
-number in the evaluation - more so than any FPGA constant, since t_pipe
-only moves the 1015 ns side of that subtraction.
+**Why 1015, and why that is SAFER than it first looks.** The break-even
+is not derived from B1 at all - it is LOOM's own cost. Both systems pay
+the same 600 ns inter-ToR wire; above it Loom pays 1015 ns:
+
+| Loom's 1015 ns above the wire | ns | |
+|---|---|---|
+| fabric edge legs (XPU->ToR, ToR->XPU) | 500 | B1 pays PCIe legs too |
+| RoCE stack TX + RX | 300 | B1's NIC does RoCE too |
+| pipe_src (lookup 25 + queue 75 + encap 100) | 200 | Loom-specific |
+| dest translate | 15 | Loom-specific |
+
+**Only 215 ns is Loom-specific logic**; the other 800 ns are costs B1 also
+pays, itemised for Loom but buried inside B1's single opaque 2400. So the
+break-even means "B1's ENTIRE end-to-end per-op cost - PCIe legs, NIC RoCE,
+doorbell/QP - totals under 1015 ns", which would leave =<215 ns for its
+GPU-side path. That is structurally hard, not marginal. (An earlier version
+of this note called the break-even "uncomfortably close to plausible IBGDA
+figures" - that was alarmist and is retracted.)
+
+**The real risk is MAGNITUDE, not sign.** Gains scale as
+(rdma_init - 1015)/1385: 1500 ns -> **0.35x** current, 2000 -> 0.71x,
+2400 -> 1.00x, 2800 -> 1.29x. At an aggressive-IBGDA 1500 ns, mixtral-64
+goes +15.27% -> ~+5% and the matrix's +40% -> ~+14%. Loom still wins; the
+headline shrinks about 3x.
+
+**PHASE C MEASUREMENT PROTOCOL - do not get this wrong.** Loom's 1015 is
+itemised while B1's rdma_init is one opaque number ADDED ON TOP of the
+600 ns wire. If `rdma_init` is measured as end-to-end NVSHMEM put latency
+between two hosts, that figure ALREADY INCLUDES the wire, and adding 600
+double-counts it - inflating B1 by ~20% and Loom's apparent gain with it.
+Measure either a same-host/loopback initiation cost, or an end-to-end
+number with the wire subtracted before it enters the config.
 
 **APP RANK PLACEMENT IS CORRECT - CHECKED, NOT ASSUMED (2026-08-04).**
 Topology is `[8 xpus, 8 racks]`, so rank r lives in rack r//8. Comm-group
