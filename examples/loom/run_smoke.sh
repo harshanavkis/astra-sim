@@ -20,8 +20,6 @@ RM=examples/remote_memory/analytical/no_memory_expansion.json
 # run_matrix.sh; the old static config handed it B1's network by mistake.
 python3 $GEN --mode loom     --racks 2 --xpus-per-rack 2 -o /tmp/net_smoke_loom.yml
 python3 $GEN --mode baseline --racks 2 --xpus-per-rack 2 -o /tmp/net_smoke_b1.yml
-python3 $GEN --mode baseline --racks 2 --xpus-per-rack 2 --rdma-init-ns 2800 \
-    -o /tmp/net_smoke_b2.yml
 
 echo "system,wall_cycles,exposed_comm_cycles"
 run() {  # $1 label, $2 network yml, $3 system json, extra args...

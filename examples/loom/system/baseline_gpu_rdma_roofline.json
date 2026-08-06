@@ -23,5 +23,9 @@
     "local-mem-bw": 3350,
     "boost-mode": 0,
     "roofline-enabled": 1,
-    "peak-perf": 839
+    "peak-perf": 839,
+    "endpoint-issue-overhead": [
+        0,
+        2400
+    ]
 }

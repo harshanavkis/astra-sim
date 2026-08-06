@@ -92,8 +92,15 @@ def build_yaml(args) -> str:
         bw1 = args.net_bw * args.loom_goodput / args.uplink_oversub
     elif args.mode == "baseline":
         lat0 = args.fabric_latency
-        # RDMA initiation is paid per scale-out op only (a dim1 crossing);
-        # in-rack peer access is a plain store, same as Loom's
+        # dim1 latency is now the WIRE ONLY. The baseline's per-operation
+        # RDMA initiation cost moved to `endpoint-issue-overhead` in the
+        # system JSON (2026-08-04), because it is endpoint OCCUPANCY, not
+        # link latency: charged in `latency` it was pipelined away by chunk
+        # overlap, and it was charged twice per point-to-point transfer
+        # (send and recv) when an RDMA write initiation is paid once, by
+        # the sender. --rdma-init-ns survives, defaulting to 0, purely so
+        # the old latency representation can still be reproduced for the
+        # latency-vs-overhead bracket.
         lat1 = args.net_latency + args.rdma_init_ns
         bw1 = args.net_bw * args.roce_goodput
     else:  # ideal
@@ -186,7 +193,7 @@ def main():
                         "are precisely the baseline rdma-init components). "
                         "Coyote RoCE floor measures this; set 0 if "
                         "--pipe-ns is measured inclusive")
-    p.add_argument("--rdma-init-ns", type=float, default=2400.0,
+    p.add_argument("--rdma-init-ns", type=float, default=0.0,
                    help="baseline per-op RDMA initiation cost after the wire, "
                         "folded into dim1 (B1 GPU-initiated 2400 -> ~3us "
                         "end-to-end, IBGDA/NVSHMEM-class; B2 CPU proxy 2800 "

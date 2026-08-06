@@ -218,3 +218,139 @@ README → "Constants: who owns each number".
    *understated* in all current results.
 5. Loom's dim1 advantage (1900 vs 3000 ns) now exceeds its dim0 penalty —
    verify the matrix cells that flipped sign track this and not an artifact.
+
+## 6. Endpoint issue overhead (design doc, added 2026-08-04)
+
+### 6.1 The problem
+
+The baseline's per-operation RDMA initiation cost (`rdma_init`) was folded
+into dim1 `latency`. That is the wrong *kind* of quantity, and it is wrong
+in two measurable ways.
+
+**It is occupancy, not latency.** A doorbell write, a WQE fetch across
+PCIe, and NIC command processing occupy the issuing path: the next
+operation cannot start until they are done. Link latency does not behave
+that way - it pipelines. In the analytical backend, `latency` is
+overlappable and `bandwidth` is the serializing resource, which we
+measured directly:
+
+| representation of the same 2400 ns | 64 GPU all_reduce 1 MB |
+|---|---|
+| dim1 `latency` | Loom +40.48% |
+| effective-`bandwidth` derating | Loom -0.64% |
+
+A 41-point swing from placement alone - larger than the uncertainty in the
+constant itself. Worse, `d(wall)/d(latency)` is exactly **0** for the
+64 GPU / 64 MB cell: charged as latency, the cost can vanish entirely.
+
+**It was charged twice per point-to-point transfer.** Measured on p2p
+cross-rack 4 KB x 8: the latency representation adds `16 x 2400` over the
+wire-only baseline, i.e. twice per transfer (send leg and recv leg). An
+RDMA WRITE initiation is paid **once, by the sender**. Loom's dim1 latency
+was doubled identically, so the reported *gain percentages* survived, but
+both systems' absolute times were inflated about 2x.
+
+Neither `latency` nor `bandwidth` can express a fixed per-message cost
+correctly across sizes: `latency` has the right magnitude but overlaps
+away, `bandwidth` serializes but is a rate, so it needs recalibrating for
+every message size (96% derate at 1 MB, 28% at 64 MB, for the same
+2400 ns). The analytical backend is missing a degree of freedom, not a
+calibration.
+
+### 6.2 Why not another simulator
+
+- **`endpoint-delay`** looks like the right knob and is not: it maps to
+  `communication_delay` and is passed to `MemBus`, the NPU<->memory
+  -accelerator bus, never to the network. Proven empirically - B3 with
+  `endpoint-delay: 1` and B1 with `10` produced byte-identical p2p results.
+- **LogGP `L/o/g/G`** are parsed by `Sys` - `o` is literally "per-message
+  overhead" - and also go to `MemBus`.
+- **ns-3 backend** models the wire, not the host: `rdma-hw` exposes only
+  congestion control and link-layer knobs (`CcMode`/DCQCN, `Mtu`, PFC,
+  rate control). Grepping its RDMA path for doorbell/WQE/post_send returns
+  nothing; `AddQueuePair` starts sending immediately. It would also force
+  the scale-up fabric to be modelled as Ethernet, since it has no
+  NVLink/PCIe link model, and one backend serves the whole network.
+- **Garnet** is not present in this checkout (the build script references a
+  missing submodule) and is an on-chip NoC model regardless.
+- **SST/Ember, LogGOPSim, SimGrid** do model endpoint overhead as
+  first-class LogGP `o`, but adopting one means abandoning Chakra ETs, STG
+  workloads, the harness and the 512-GPU scale sweep.
+
+### 6.3 The mechanism used
+
+`Sys::sim_send(Tick delay, ...)` already defers injection when `delay != 0`,
+and is plumbed through every send path with every caller passing 0:
+
+```cpp
+if (delay == 0)  comm_NI->sim_send(...);                  // immediate
+else             try_register_event(new SimSendCaller(...), ..., delay);
+```
+
+Deferring the injection puts the cost on the **issuing stream's** critical
+path while concurrent streams (`active-chunks-per-dimension`) still
+overlap. That is *partially pipelined*, which is how GPU-initiated RDMA
+actually behaves - several operations in flight, each costing issue time -
+and it sits between the two extremes of the latency and bandwidth
+representations rather than at either.
+
+### 6.4 Interface
+
+Per-dimension array in the system JSON, mirroring how collective
+implementations are already configured:
+
+```json
+"endpoint-issue-overhead": [0, 2400]
+```
+
+| system | value | meaning |
+|---|---|---|
+| Loom | `[0, 0]` | a store; no transport software on the issue path |
+| B1 GPU-initiated RDMA | `[0, 2400]` | doorbell + WQE + NIC command processing |
+| B2 CPU-proxy RDMA | `[0, 2800]` | as B1, plus host post/poll |
+
+dim0 is always 0: an in-rack peer access is a plain store for every system.
+Absent key == all zeros, so the hook is inert unless configured.
+
+Consequence for the network YAML: baseline dim1 latency is now the **wire
+only** (600 ns). `--rdma-init-ns` survives with default 0 purely so the old
+latency representation can be reproduced for the latency-vs-overhead
+bracket.
+
+### 6.5 Implementation notes
+
+The dimension is derived from **src/dst coordinates**, not
+`request->vnet`. The point-to-point path (`Workload.cc:405`) builds a
+`sim_request` with `srcRank`/`dstRank`/`reqType` and never sets `vnet`, so
+reading it there is undefined behaviour - the first version of this patch
+had exactly that bug, and it silently charged nothing on the p2p path.
+Coordinates work for collectives and p2p alike:
+
+```
+for each dim d:  if (src % dims[d]) != (dst % dims[d])  crossed = d
+                 src /= dims[d];  dst /= dims[d]
+```
+
+### 6.6 Validation gates
+
+1. **Null**: key absent == `[0,0]` == prior `rdma_init=0` result. PASSES
+   (57,195 three ways). The hook is inert when unset.
+2. **In-rack**: unaffected, since dim0 is charged 0. PASSES (8,472 both).
+3. **Collective divergence**: the two representations must now differ.
+   PASSES (64 GPU 1 MB: 191,595 as latency vs 124,395 as overhead).
+4. **Single-message equivalence**: deliberately NOT expected to hold - see
+   6.1, the latency representation double-charges p2p. The overhead
+   representation charges once, which is the correct semantics.
+5. **Hiding**: at 64 GPU / 64 MB the overhead is absorbed exactly as the
+   latency was (909,088 at overhead 0, 2400 and 4800). Same conclusion
+   under both representations, so **that tie is structural - a dim0-bound
+   cell - and not an artifact of the representation.**
+
+### 6.7 What this does not fix
+
+The *value* is still unmeasured. `rdma_init` remains bracketed between
+2400 ns (literature-derived, isolates initiation) and ~6900 ns (upper
+bound: an end-to-end NVSHMEM put with only our assumed wire removed, so it
+also absorbs their wire and NVSHMEM library overhead). This change fixes
+*where* the cost is charged and *how it composes*, not what it is. Phase C
+must still decompose B1 with the same discipline as Loom's side.

@@ -40,8 +40,6 @@ ITERS=${ITERS:-8}
 
 python3 $GEN --mode loom     --racks 2 --xpus-per-rack 8 -o /tmp/net_p2p_loom.yml
 python3 $GEN --mode baseline --racks 2 --xpus-per-rack 8 -o /tmp/net_p2p_b1.yml
-python3 $GEN --mode baseline --racks 2 --xpus-per-rack 8 --rdma-init-ns 2800 \
-    -o /tmp/net_p2p_b2.yml
 
 echo "route,size_kb,system,wall_cycles"
 for ROUTE in in_rack cross_rack; do
@@ -53,7 +51,7 @@ for ROUTE in in_rack cross_rack; do
         --src 0 --dst $DST --size-kb $S --iters $ITERS --out $WL >/dev/null
     for SYS in "loom loom.json /tmp/net_p2p_loom.yml" \
                "b1_gpu_rdma baseline_gpu_rdma.json /tmp/net_p2p_b1.yml" \
-               "b2_cpu_proxy baseline_cpu_proxy.json /tmp/net_p2p_b2.yml --rendezvous-protocol=true"; do
+               "b2_cpu_proxy baseline_cpu_proxy.json /tmp/net_p2p_b1.yml --rendezvous-protocol=true"; do
       set -- $SYS; NAME=$1; SYSJ=$2; NET=$3; shift 3
       # MAX over all ranks, not sys[0]: in eager mode the sender completes
       # at injection (posted-write source-local completion), and the six

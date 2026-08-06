@@ -59,8 +59,6 @@ for M in $DOMAINS; do
   R=$((TOTAL / M))
   python3 $GEN --mode loom     --racks $R --xpus-per-rack $M -o /tmp/net_dom_loom.yml
   python3 $GEN --mode baseline --racks $R --xpus-per-rack $M -o /tmp/net_dom_b1.yml
-  python3 $GEN --mode baseline --racks $R --xpus-per-rack $M --rdma-init-ns 2800 \
-      -o /tmp/net_dom_b2.yml
   for C in $COLLS; do
     for S in $SIZES; do
       WLDIR=/tmp/dombench && mkdir -p $WLDIR && ( cd $WLDIR && \
@@ -69,7 +67,7 @@ for M in $DOMAINS; do
       WL=$WLDIR/$C/${TOTAL}npus_${S}MB/$C
       for SYS in "loom loom.json /tmp/net_dom_loom.yml" \
                  "b1_gpu_rdma baseline_gpu_rdma.json /tmp/net_dom_b1.yml" \
-                 "b2_cpu_proxy baseline_cpu_proxy.json /tmp/net_dom_b2.yml --rendezvous-protocol=true"; do
+                 "b2_cpu_proxy baseline_cpu_proxy.json /tmp/net_dom_b1.yml --rendezvous-protocol=true"; do
         set -- $SYS; NAME=$1; SYSJ=$2; NET=$3; shift 3
         OUT=$($BIN --workload-configuration=$WL \
           --system-configuration=$ROOT/examples/loom/system/$SYSJ \
