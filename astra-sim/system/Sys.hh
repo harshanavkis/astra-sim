@@ -279,6 +279,23 @@ class Sys : public Callable {
     double injection_scale;
     int communication_delay;
     int local_reduction_delay;
+    // Per-dimension endpoint ISSUE overhead, in ns, charged on the sending
+    // side of every message on that dimension. This is occupancy, not wire
+    // latency: it defers the injection of THIS message, so it lands on the
+    // issuing stream's critical path while concurrent streams still
+    // overlap - which is how a real GPU-initiated RDMA post behaves
+    // (doorbell + WQE fetch + NIC command processing).
+    //
+    // The analytical network backend has no such notion: it offers only
+    // per-dimension `latency` (which pipelines away when chunks overlap)
+    // and `bandwidth` (which serializes but is a rate, so it cannot express
+    // a fixed per-message cost across sizes). Folding an RDMA initiation
+    // cost into `latency` therefore UNDER-counts it, and folding it into
+    // `bandwidth` requires per-message-size calibration. Note that
+    // `endpoint-delay` does NOT do this job - it maps to communication_delay
+    // and is passed to MemBus (the NPU<->memory-accelerator bus), not the
+    // network.
+    std::vector<Tick> endpoint_issue_overhead;
 
     // network
     AstraNetworkAPI* comm_NI;

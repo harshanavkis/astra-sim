@@ -175,6 +175,7 @@ Sys::Sys(int id,
     this->injection_scale = injection_scale;
     this->communication_delay = 0;
     this->local_reduction_delay = 0;
+    this->endpoint_issue_overhead = {};
 
     this->comm_NI = comm_NI;
     this->comm_scale = comm_scale;
@@ -366,6 +367,12 @@ bool Sys::initialize_sys(string name) {
     if (j.contains("endpoint-delay")) {
         communication_delay = j["endpoint-delay"];
         communication_delay = communication_delay * injection_scale;
+    }
+    if (j.contains("endpoint-issue-overhead")) {
+        // per-dimension array, e.g. [0, 2400]: none in-rack, RDMA
+        // initiation cost on the scale-out dimension
+        std::vector<Tick> v = j["endpoint-issue-overhead"];
+        endpoint_issue_overhead = v;
     }
     if (j.contains("model-shared-bus")) {
         int inp_model_shared_bus = j["model-shared-bus"];
@@ -1368,6 +1375,28 @@ int Sys::sim_send(Tick delay,
                   sim_request* request,
                   void (*msg_handler)(void* fun_arg),
                   void* fun_arg) {
+    // Charge the per-dimension endpoint issue overhead, if configured.
+    //
+    // The dimension is derived from src/dst coordinates rather than from
+    // request->vnet: the point-to-point path in Workload.cc builds a
+    // sim_request WITHOUT setting vnet, so reading it there is undefined.
+    // Coordinates work for every path - collectives and p2p alike.
+    if (!endpoint_issue_overhead.empty() && !physical_dims.empty()) {
+        int src_coord = id;
+        int dst_coord = dst;
+        int crossed_dim = -1;
+        for (size_t d = 0; d < physical_dims.size(); d++) {
+            if ((src_coord % physical_dims[d]) != (dst_coord % physical_dims[d])) {
+                crossed_dim = static_cast<int>(d);
+            }
+            src_coord /= physical_dims[d];
+            dst_coord /= physical_dims[d];
+        }
+        if (crossed_dim >= 0 &&
+            crossed_dim < static_cast<int>(endpoint_issue_overhead.size())) {
+            delay += endpoint_issue_overhead[crossed_dim];
+        }
+    }
     if (delay == 0) {
         comm_NI->sim_send(buffer, count, type, dst, tag, request, msg_handler,
                           fun_arg);
