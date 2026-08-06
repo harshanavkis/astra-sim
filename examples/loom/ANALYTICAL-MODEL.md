@@ -1,330 +1,349 @@
 # The analytical model, number by number (inspection document)
 
-> **Last updated: 2026-07-08 (D13 stage params; FPGA-owned constants marked ⚑).** Living document (CLAUDE.md rule 1). Every
-> constant and modeling decision in the simulation, with its value,
-> decomposition, what it includes/excludes per system, provenance, and the
-> reasoning — so each can be inspected and vetoed individually.
+> **Last updated: 2026-08-04 — REWRITTEN for consistency.** Living document
+> (CLAUDE.md rule 1). Every constant and modelling decision in the
+> simulation, with its value, decomposition, what it includes/excludes per
+> system, provenance, and the reasoning — so each can be inspected and
+> vetoed individually.
+>
+> This rewrite was needed because a run of model corrections (in-rack
+> increment → 0, goodput → equal, `t_forward` double-count removed, B3
+> deleted, and above all `rdma_init` moved out of dim1 latency into
+> endpoint occupancy) left the previous text describing a model that no
+> longer existed. Where a number changed, the old value and the reason are
+> recorded in §4 rather than silently overwritten.
 
 ## 0. The four cases at a glance (one peer write)
 
-Every case: XPU issues a store (endpoint-delay 10 ns, identical everywhere)
-+ the steps below + size/BW serialization.
-
 | Case | Steps | Total |
 |---|---|---|
-| **Loom in-rack** | fabric traversal incl. stock switching (500) + t_pipe_local lookup adder (50) | **560 ns** |
-| **Loom cross-rack** | edge fabric legs XPU↔ToR both ends (500) + source ToR `t_lookup+t_queue+t_encap` (200) + RoCE TX stream (150) + wire (600) + RoCE RX stream (150) + dest `t_translate+t_forward` (25 — no range lookup: the connection identifies the binding) | **1635 ns** |
-| **Baseline in-rack** | fabric traversal (500) — a plain peer store, no RDMA machinery exists on this route | **510 ns** |
-| **Baseline cross-rack** | create WQE + doorbell (every transfer) + NIC: WQE fetch/QP ctx/payload DMA/packet + wire + receive NIC = `rdma_init` 2400 + wire 600, from the ≈3 µs end-to-end anchor (which already includes its PCIe legs) | **3010 ns** |
+| **Loom in-rack** | fabric traversal incl. stock switching (500) | **500 ns** |
+| **Loom cross-rack** | edge fabric legs XPU↔ToR both ends (500) + source ToR `t_lookup+t_queue+t_encap` (200) + RoCE TX stream (150) + wire (600) + RoCE RX stream (150) + dest `t_translate` (15) | **1615 ns** |
+| **Baseline in-rack** | fabric traversal (500) — a plain peer store, no RDMA machinery on this route | **500 ns** |
+| **Baseline cross-rack** | wire (600) **as latency**, plus `rdma_init` (2400 B1 / 2800 B2) **as endpoint occupancy** — see §6 | **600 ns latency + 2400/2800 ns occupancy** |
 
-Loom never pays: WQE/doorbell/QP-fetch/payload-DMA (done once at binding
-time, control path). Baseline in-rack never pays anything Loom-like except
-that Loom adds 50 ns of lookup. The cross-rack gap (1660 vs 3010) is the
-moved-to-setup machinery.
+**In-rack is identical for every system (500 ns).** Loom does not bolt a
+translator onto someone else's switch — the Loom ToR *is* the rack switch,
+and its in-rack datapath does what any peer-store path already does
+(range-indexed table consult + bounds check). NVIDIA documents the same
+class of work inside NVSwitch. See D15.
+
+Cross-rack, Loom never pays WQE creation, doorbell, QP fetch or payload
+DMA: those happen once, at binding time, on the control path. That
+asymmetry is the paper's claim rendered as arithmetic.
 
 ## 1. The latency equations
 
 (Visualized in `figures/loom-latency-breakdown.drawio.xml`.)
 
-A message's end-to-end latency = `endpoint-delay` (system JSON, per
-message, route-invariant) + per-hop dimension latency (network YAML) +
-`size / dimension-bandwidth` serialization. Per mode:
-
 ```
-              dim0 (in-rack)                    dim1 (cross-rack)
-Loom     :  fabric + t_pipe_local          fabric legs (both ends)                  = 500
-           = 500 + 50        = 550 ns          + (t_lookup+t_queue+t_encap) + roce [src] = 350
-                                               + wire                                    = 600
-                                               + roce + (t_translate+t_forward)  [dest]  = 175
-                                                                              total 1625 ns
+              dim0 (in-rack)             dim1 (cross-rack)
+Loom      :  fabric        = 500 ns   fabric legs (both ends)              =  500
+                                      + (t_lookup+t_queue+t_encap) + roce  =  350   [src]
+                                      + wire                               =  600
+                                      + roce + t_translate                 =  165   [dest]
+                                                                     total = 1615 ns
+B1 (GPU)  :  fabric        = 500 ns   wire = 600 ns   + issue overhead 2400 ns (§6)
+B2 (proxy):  fabric        = 500 ns   wire = 600 ns   + issue overhead 2800 ns (§6)
+                                                      + --rendezvous-protocol
 
-Stage params (one per hw-controller block; what the FPGA measures per
-pipeline stage): t_lookup 25 (Source Validation + Route Selector) ·
-t_queue 75 (Per-Destination Queues + Scheduler, uncontended) · t_encap 100
-(TX Encapsulator) · roce_stream 150/side (QP Router + RoCEv2; RX includes
-the RX Decapsulator) · t_translate 15 (Transaction Generator: bounds +
-offset→PA) · t_forward 10 (Local Forward Engine). Derived:
-t_pipe_local = lookup+translate+forward = 50;
-source pipeline = lookup+queue+encap = 200; dest = translate+forward = 25.
-Coarse overrides --pipe-ns/--pipe-local-ns serve the sweeps.
-B1 (GPU) :  fabric           = 500 ns     wire + rdma_init_B1 = 600 + 2400 = 3000 ns
-B2 (proxy): fabric           = 500 ns     wire + rdma_init_B2 = 600 + 2800 = 3400 ns  (+ rendezvous)
-B3 (ideal): fabric           = 500 ns     wire                = 600 ns
-
-bandwidth: dim0 = 64 GB/s (all)   dim1 = 50 GB/s × goodput
-           goodput: Loom 0.947 · baselines 0.95 · ideal 1.0
-endpoint-delay: 10 ns, ALL systems (HGX-validated store-issue cost)
+bandwidth : dim0 = 64 GB/s (all)      dim1 = 50 GB/s x goodput 0.95 = 47.5 (all)
 ```
+
+Stage params, one per hw-controller block — what the FPGA measures per
+pipeline stage: `t_lookup` 25 (Source Validation + Route Selector) ·
+`t_queue` 75 (Per-Destination Queues + Scheduler, uncontended) · `t_encap`
+100 (TX Encapsulator) · `roce_stream` 150/side (QP Router + RoCEv2; RX
+includes the RX Decapsulator) · `t_translate` 15 (Transaction Generator:
+bounds + offset→PA) · `t_forward` 10 (Local Forward Engine).
+
+Derived route costs: **local adder 0** (D15) · source pipeline
+`lookup+queue+encap` = 200 · destination `translate` = 15 (D17).
+Coarse overrides `--pipe-ns`/`--pipe-local-ns` serve the sweeps.
+
+**`t_forward` appears in no route term** (D17): the ToR's forwarding is
+already inside `fabric_latency`, and the destination's egress is inside
+the `fabric_latency` edge leg that dim1 already counts. Charging it again
+counted it twice.
 
 ### How the simulator composes dimensions (why the legs are in dim1)
 
 AstraSim's dimensions are **alternatives, not layers**:
 `MultiDimTopology::send()` selects the single dimension a hop travels in
 and prices it with that dimension's latency/BW alone — dim0 is never added
-underneath a dim1 hop. Consequently each dimension's latency must describe
-the COMPLETE physical path of one hop of its type:
+underneath a dim1 hop. So each dimension's latency must describe the
+COMPLETE physical path of one hop of its type:
 
-- a dim0 hop = the full in-rack trip, XPU→ToR→XPU (550 Loom / 500 baseline);
-- a dim1 hop = the full cross-rack trip, XPU→ToR→wire→ToR→XPU
-  (1650 Loom, legs included per D11 / 3000 baseline, legs inside its
-  end-to-end anchor).
+- a dim0 hop = the full in-rack trip, XPU→ToR→XPU (500, all systems);
+- a dim1 hop = the full cross-rack trip, XPU→ToR→wire→ToR→XPU (1615 Loom,
+  legs included per D11; 600 baseline, its endpoint cost now charged
+  separately as occupancy rather than buried in this term — D14).
 
-Without D11, the sim's dim1 hop would leave XPU memory and arrive at the
-source ToR for free. Hierarchical collectives that phase dim0-then-dim1 pay
-full dim0 + full dim1 — also physically correct, because dimension-phased
-algorithms genuinely store-and-forward through an intermediate XPU's memory.
-The baseline's dim0/dim1 really are disjoint physical paths (fabric vs NIC),
-which is why the orthogonal-dims assumption fits it exactly; Loom's dims
-share the edge link and ToR — correct in latency accounting (D11), not
-capturable in contention (the D8 gap, congestion tier).
+**Lumping note:** the analytical hop is one scalar — `latency + size/BW` —
+and the simulator has no notion of where along the path time is spent. The
+remote ToR's share is "paid at the source" only in the sense that all terms
+are summed; for delivery time this is provably equivalent (addition
+commutes), and both systems are lumped identically, so no comparison bias
+enters. Location starts to matter only where queues form — the congestion
+tier and ns-3.
 
-**Lumping note:** the analytical hop is one scalar — `latency + size/BW`
-charged at the hop; the simulator has no notion of where along the path
-time is spent. The remote ToR's share (decap/translate, 200 of the 1650)
-is "paid at the source" only in the sense that all terms are summed into
-one number; for delivery time this is provably equivalent (addition
-commutes), and both systems are lumped identically (the baseline's receive
-NIC sits inside its 3000 the same way), so no comparison bias enters.
-Location starts to matter only where queues can form — the congestion tier
-and ns-3, where delays genuinely sit at devices. Bandwidth is lumped the
-same way (one 47.35 GB/s pipe, min-segment governs; benign since the
-network segment is the bottleneck and cut-through overlaps segments).
+**Why the number of exposed traversals matters more than any single
+constant.** Because Loom and the baseline now differ in exactly two places
+— dim1 latency (1615 vs 600) and endpoint occupancy (0 vs 2400/2800) —
+every collective result reduces to how many cross-rack operations a
+workload performs, and how many of them are exposed rather than overlapped.
+Measured: exposed traversals = `2(racks-1) x preferred-dataset-splits`
+when exposed at all. Hence gains grow with rack count, and a dense LLM
+iteration (≈12 exposed cross-rack ops) benefits far less than an MoE one
+(≈2128).
 
-## 2. The core asymmetry (why Loom's dim1 ≠ baseline's dim1)
+## 2. The core asymmetry (why Loom's cross-rack cost ≠ the baseline's)
 
 **The baseline creates and submits a work request for every transfer.**
-Its per-op cost decomposes into:
 
-| Component | Where it happens | Approx. share |
+| Component | Where | Approx. share |
 |---|---|---|
 | WQE creation + doorbell ring | GPU kernel (B1) / CPU proxy after GPU handoff (B2) | 100s ns (B1) / µs-class incl. handoff (B2) |
 | Doorbell processing + WQE fetch over PCIe | NIC | ~400–800 ns (PCIe round trip) |
 | QP-context fetch/update | NIC | ~100s ns (cache-dependent) |
-| Payload DMA from device/host memory over PCIe | NIC | ~400–800 ns first bytes |
+| Payload DMA from device memory over PCIe | NIC | ~400–800 ns first bytes |
 | Packet build / ICRC / congestion state | NIC pipeline | ~100–200 ns |
-| **Total per op (end-to-end anchors)** | | **B1 ≈ 3 µs** (IBGDA/NVSHMEM published puts) → `rdma_init_B1 = 2400` after the 600 ns wire; **B2** = ib_write_lat ≈ 1.6–2 µs + GPU→proxy handoff ≈ 1–1.5 µs → `rdma_init_B2 = 2800` |
 
-**Loom performs none of the initiation on the data path.** Connections are
-established once, at binding time, by the orchestrator's connection manager
-(control path); QP context is resident in the switch; the payload is not
-DMA-fetched — it streams from the fabric port through the encapsulator into
-the RoCE engine. On the data path the RC connections act as pipes, bounded
-by the routing pipeline's capability. What remains per traversal:
-
-| Component | Loom pays? | Where it lives in the model |
-|---|---|---|
-| WQE/doorbell/QP-fetch/payload-DMA | **No** (control path did it once) | — (this is the modeled asymmetry) |
-| Binding lookup, bounds, translate, encap/decap | Yes | `t_pipe` = 500 ns* per traversal |
-| Packet build / ICRC / CC state (streaming share) | Yes | `roce_stream` = 150 ns per traversal |
+**Loom performs none of this on the data path.** Connections are
+established once, at binding time, by the orchestrator's connection manager;
+QP context is resident in the switch; the payload is not DMA-fetched — it
+streams from the fabric port through the encapsulator into the RoCE engine.
+What remains per traversal is the routing pipeline (200 ns source, 15 ns
+destination) and the RoCE streaming share (150 ns per side).
 
 The two ToR traversals are **asymmetric** (D10): the source runs the full
-remote pipeline (lookup/validate + encap = `t_pipe`); the destination runs
-RoCE RX + decap + the *same* check/translate/forward that local delivery
-uses — both routes converge on the transaction generator (design §6.1) —
-so it costs the delivery stages only (translate+forward = 25; even less
-than local, which also range-matches). Only the RoCE streaming share is
-paid at both ends (the baseline pays its receive-side NIC too, inside its
-end-to-end anchor). So `dim1(Loom) = 1625 ns` vs
-`dim1(B1) = 3000 ns`: the gap **is** the moved-to-setup work-request
-machinery, which is the paper's claim rendered as arithmetic. If the claim is wrong, the testbed
-will say so: T3 measures the composite per-traversal cost through Coyote's
-actual RoCE stack, and the substrate RoCE ping-pong floor isolates the
-transport share. **Accounting rule: never add `roce_stream` on top of a
-`t_pipe` measured inclusive of the stack — set it to 0 then.**
+remote pipeline; the destination runs RoCE RX + decap + the same bounds/
+translate that local delivery uses — both routes converge on the
+transaction generator (design §6.1).
+
+**Accounting rule:** never add `roce_stream` on top of a `t_pipe` measured
+inclusive of the stack — set it to 0 then.
 
 ## 3. Constants ledger
 
 | Constant | Value | Includes | Excludes | Provenance | Replaced by |
 |---|---|---|---|---|---|
-| `endpoint-delay` | 10 ns (all systems) | issuing one store toward the fabric | everything route-dependent | AstraSim `HGX-H100-validated.json` (validated) | — |
-| `fabric_latency` | 500 ns | rack fabric hop incl. stock switch forwarding | Loom's added lookups | PCIe5-switch class; alt preset: HGX 936.25 ns validated | testbed floor |
-| `t_lookup` | 25 ns* | Source Validation + Route Selector (range match → binding) | — | ASIC-class SRAM/TCAM lookups | **⚑ FPGA: T3 stage counter** |
-| `t_queue` | 75 ns* | Per-Destination Queues + Scheduler, uncontended pass | congestion (that's the congestion tier) | switch-design class | **⚑ FPGA: T3 stage counter** |
-| `t_encap` | 100 ns* | TX Encapsulator | coalescing benefit (T2 curve) | HW pipeline class | **⚑ FPGA: T3 stage counter** |
-| `t_translate` | 15 ns* | Transaction Generator: bounds + offset→PA | — | pipelined table read | **⚑ FPGA: T3 stage counter** |
-| `t_forward` | 10 ns* | Local Forward Engine egress | — | HW pipeline class | **⚑ FPGA: T3 stage counter** |
-| `roce_stream` | 150 ns* | QP Router + RoCEv2 per side (RX incl. Decapsulator): packet build/ICRC/CC | WQE/doorbell/QP-fetch/payload-DMA (Loom never does these on the data path) | HW packet-engine class | **⚑ FPGA: Coyote RoCE floor** |
-| derived: local adder 50 · source pipeline 200 · dest 25 | sums of the above | — | — | — | coarse sweep overrides `--pipe-ns`/`--pipe-local-ns` |
+| `endpoint-delay` | 10 ns (all) | NPU↔memory-accelerator bus cost | **anything on the network path** — it is passed to `MemBus`, NOT the network (§6.2) | AstraSim `HGX-H100-validated.json` | — |
+| `endpoint-issue-overhead` | `[0,0]` Loom · `[0,2400]` B1 · `[0,2800]` B2 | per-op RDMA initiation, charged as sender-side occupancy | in-rack (dim0 = 0 for all) | §6; value bracketed 2400–6900 | **Phase C: decomposed B1 measurement** |
+| `fabric_latency` | 500 ns | rack fabric hop incl. stock switch forwarding AND its table consult | — | PCIe5-switch class; alt preset HGX 936.25 validated | testbed floor |
+| `t_lookup` | 25 ns* | Source Validation + Route Selector | — | ASIC-class SRAM/TCAM lookup | **⚑ T3 stage counter** |
+| `t_queue` | 75 ns* | Per-Destination Queues + Scheduler, uncontended | congestion (congestion tier) | switch-design class | **⚑ T3 stage counter** |
+| `t_encap` | 100 ns* | TX Encapsulator | coalescing benefit (T2 curve) | HW pipeline class | **⚑ T3 stage counter** |
+| `t_translate` | 15 ns* | bounds + offset→PA | — | pipelined table read | **⚑ T3 stage counter** |
+| `t_forward` | 10 ns* | Local Forward Engine egress | **charged in no route term** (D17) | HW pipeline class | **⚑ T3 stage counter** |
+| `roce_stream` | 150 ns* | QP Router + RoCEv2 per side | WQE/doorbell/QP-fetch/payload-DMA | HW packet-engine class | **⚑ Coyote RoCE floor** |
+| derived | local 0 · source 200 · dest 15 | sums of the above | — | D15, D17 | `--pipe-ns`/`--pipe-local-ns` |
 | `wire` (`--net-latency`) | 600 ns | inter-ToR cut-through switch + propagation | endpoint anything | ToR datasheets (300–800 ns class) | — |
-| `rdma_init_B1` | 2400 ns | full per-op initiation (table above) minus wire | — | ≈3 µs end-to-end GPU-initiated put (IBGDA blog, NVSHMEM docs) | swept {S-4} |
-| `rdma_init_B2` | 2800 ns | ib_write_lat + GPU→proxy handoff, minus wire | — | perftest + Kalia ATC'16 + NCCL proxy path | testbed CPU-verbs run |
-| goodput 0.95 / 0.947 | — | Eth+IP+UDP+BTH ≈78 B on 4 KB MTU; Loom adds 12 B ⟨offset·op·len⟩ | coalescing benefit at small sizes (favors Loom, deliberately unmodeled until measured) | header arithmetic | **T2** goodput-vs-size curve |
-| `peak-perf` 989 vs 839 TFLOPS | full SMs vs 20/132 statically reserved | — | dynamic SM contention | DeepSeek-V3 (20 SMs of H800's 132) | swept {8, 20, 32} |
-| `read-credits` 32 | outstanding peer reads per NPU | — | per-binding granularity (approximation) | design §6.3 | **T6** + swept |
-| `--uplink-oversub` 1.0 | ToR uplink aggregate = M NICs (equal wires) | equal-cost framing (Loom deletes M NICs — favors Loom, prose only) | — | fairness choice | swept S-6 |
+| goodput | **0.95, all systems** | Eth+IP+UDP+BTH ≈78 B on 4 KB MTU | sub-64 B envelope + coalescing (T2) | header arithmetic; D16 | **T2** goodput-vs-size curve |
+| `peak-perf` | 989 vs 839 TFLOPS | full SMs vs 20/132 statically reserved | dynamic SM contention; memory-bound ops escape the tax (§6.6 of the SM sweep) | DeepSeek-V3 (20 of H800's 132) | swept {0,8,20,32} |
+| `read-credits` | 32 | outstanding peer reads per NPU | per-binding granularity | design §6.3 | **T6** + swept |
+| `--uplink-oversub` | 1.0 | ToR uplink aggregate = M NICs (equal wires) | equal-cost framing (Loom deletes M NICs — prose only) | fairness choice, D8 | not swept (D19) |
 
-\* = ⚑ FPGA-owned: MUST be measured on the Coyote/U280 testbed (per-stage
-cycle counters / RoCE floor), then frequency-scaled for the ASIC argument.
-Everything unstarred is published/validated. The full FPGA checklist is in
-README → "Constants: who owns each number".
+\* = ⚑ FPGA-owned: MUST be measured on the Coyote/U280 testbed, then
+frequency-scaled for the ASIC argument. Everything unstarred is
+published/validated. Full checklist in README → "Constants: who owns each
+number".
 
 ## 4. Decisions ledger (each individually vetoable)
 
-- **D1 — folding technique**: switch behavior as constants inside per-dim
-  latency/BW, the method of AstraSim's own validated HGX config.
+**Foundational**
+
+- **D1 — folding technique**: switch behaviour as constants inside per-dim
+  latency/BW, the method of AstraSim's own validated HGX config. Note the
+  *technique* is validated, not our numbers: the only validated config in
+  the repo is single-dimension, 8 GPUs, NVLink 400 GB/s / 936.25 ns. There
+  is no validated multi-node config, and ASTRA-sim models scale-out as an
+  idealized link with no endpoint cost at all.
 - **D2 — route-split endpoint costs** *(user-identified)*: in-rack peer
   access is a plain store for every system; RDMA initiation exists only on
-  the scale-out route → lives in dim1, not in `endpoint-delay` (which
-  AstraSim applies to every message regardless of route).
+  the scale-out route. **Revised 2026-08-04**: it lives in
+  `endpoint-issue-overhead[dim1]`, not in dim1 latency (D14) and not in
+  `endpoint-delay`, which never reaches the network at all.
 - **D3 — the ToR is the rack switch** *(user-identified)*: stock forwarding
-  is already inside `fabric_latency`; in-rack Loom pays only `t_pipe_local`.
-- **D4 — composite per-traversal pipeline** *(user-identified)*: transport
-  processing composes INTO the pipeline term; no separate additive NIC
-  charge (double-counting guard for T3 calibration).
+  is already inside `fabric_latency`. **Extended by D15.**
+- **D4 — composite per-traversal pipeline**: transport processing composes
+  INTO the pipeline term; no separate additive NIC charge.
 - **D5 — control-path vs data-path RDMA** *(user-identified)*: Loom never
   creates/submits work requests on the data path; only the streaming share
-  (`roce_stream` = 150 ns) survives per traversal. The baseline pays the
-  full per-op initiation every transfer.
+  survives per traversal.
 - **D6 — SM reservation as peak-perf scaling**: production reserves SMs
-  statically (DeepSeek-V3), so compute-speed scaling is the faithful model;
-  applies only to B1.
-- **D7 — eager = posted write; rendezvous = B2's handshake**: AstraSim's
-  eager sender completes at injection = a posted store accepted by the
-  switch (design §6.2).
-- **D8 — equal-wires fairness** with the disclosed orthogonal-dims gap
-  (Loom's shared XPU edge port is not contended in the analytical tier —
-  favors Loom; congestion-tier item).
+  statically (DeepSeek-V3), so compute-speed scaling is faithful; applies
+  to the baselines only.
+- **D7 — eager = posted write; rendezvous = B2's handshake**.
+- **D8 — equal-wires fairness**, with the disclosed orthogonal-dims gap
+  (Loom's shared XPU edge port is not contended in this tier — favours Loom).
 - **D9 — no hand-authored applications**: shipped ETs, STG published
   shapes, or captured traces only.
+- **D10 — asymmetric remote traversals** *(user-identified)*: destination
+  work = the delivery pipeline, not a second full `t_pipe`.
 - **D11 — edge legs included** *(user-identified)*: Loom's dim1 adds one
-  full fabric traversal for the XPU↔ToR legs at both ends; the baseline's
-  end-to-end anchor already contains its PCIe legs, so only Loom's
-  decomposed path needed them added explicitly.
-- **D13 — per-stage parameters** *(user-identified)*: pipeline costs are
-  parameterized one-per-hw-controller-block (lookup/queue/encap/roce/
-  translate/forward), matching what the FPGA measures per stage and what
-  the FPGA→ASIC frequency-scaling argument needs; route costs are derived
-  sums, coarse knobs remain as sweep overrides.
-- **D12 — t_pipe is source-side lookup/encap only** *(user-identified)*:
-  after D4/D5/D10 the remaining content of t_pipe is a few pipelined table
-  lookups + header prepend → ASIC-class 200 ns, not 500.
-- **D10 — asymmetric remote traversals** *(user-identified)*: destination-
-  side remote work = the local-route delivery pipeline (`t_pipe_local`),
-  not a second full `t_pipe`; RoCE streaming share at both ends. Charging
-  a full pipeline at the destination was inconsistent with pricing the
-  identical table work at 50 ns on the local route.
+  full fabric traversal for the XPU↔ToR legs at both ends.
+- **D12 — t_pipe is source-side lookup/encap only** *(user-identified)*.
+- **D13 — per-stage parameters** *(user-identified)*: one per
+  hw-controller block, matching what the FPGA measures.
+
+**Added 2026-08-04 — each changed a number, so each is recorded with what
+it replaced**
+
+- **D14 — endpoint cost is OCCUPANCY, not latency** *(user-identified)*.
+  `rdma_init` moved from dim1 latency to `endpoint-issue-overhead`.
+  Charged as latency it (a) pipelined away — `d(wall)/d(latency)` is
+  exactly 0 for the 64 GPU/64 MB cell — and (b) was charged **twice** per
+  point-to-point transfer, when an RDMA WRITE initiation is paid once, by
+  the sender. Effect: 64 GPU all_reduce 1 MB went +40.48% → +8.33%.
+  Full design in §6.
+- **D15 — the in-rack increment is ZERO** *(user-identified)*. Was 50 ns
+  (`t_lookup+t_translate+t_forward`), then 40, now 0. Loom does not add a
+  translator to someone else's switch: the Loom ToR *is* the rack switch,
+  and NVSwitch already performs range-indexed lookup and bounds checking
+  in its datapath. **Caveat: in-rack parity is now a modelling identity,
+  not a result** — do not present it as evidence; T3 supplies the
+  empirical delta.
+- **D16 — Loom's bulk goodput EQUALS RoCE's** *(user-identified)*. Was
+  0.947 (RoCE × 4096/4108, assuming a separate 12 B header). The Coyote
+  prototype sends no such header: bulk traffic is an ordinary RDMA WRITE
+  and offset/op/len ride in RDMA's own BTH/RETH. Real overhead is the
+  sub-64 B inline envelope, which is a size-dependent curve owned by T2.
+- **D17 — `t_forward` is not double-counted** *(user-identified)*. It was
+  charged in both local-route terms despite the model's own statement that
+  the ToR's forwarding sits inside `fabric_latency`.
+- **D18 — B3 (ideal bound) removed** *(owner decision)*. A bound, not a
+  system anyone builds; "gain over an ideal bound" is negative by
+  definition and made every figure harder to read. NOTE: catalog item A0
+  was specified as normalized to B3 and now needs a different normalizer.
+- **D19 — one physical topology, scale is the axis** *(user-identified)*.
+  `[Switch, Switch]` everywhere; **8 XPUs per rack fixed** (the deployed
+  scale-up domain — DGX/HGX, NVIDIA EOS is 576 nodes × 8); rack count is
+  the axis. A `ring_tor` row and a `thin_uplinks` row were deleted as
+  unrepresentative, and oversubscription is not swept: handicapping only
+  Loom breaks equal-wires, and under equal *cost* the argument runs the
+  other way since Loom deletes M NICs per rack.
 
 ## 5. Open items for inspection
 
-1. `roce_stream = 150 ns` is the newest and least-anchored placeholder —
-   the Coyote RoCE floor measurement replaces it; if Coyote's FPGA stack is
-   much slower, the FPGA-vs-ASIC argument must carry the difference.
-2. `rdma_init_B1 = 2400 ns` assumes the published ≈3 µs end-to-end put is
-   wire + initiation only; if it amortizes batching, B1 is being flattered.
-3. `t_pipe_local = 50 ns` presumes lookups pipeline behind stock
-   arbitration; T3 will say whether the FPGA adder is 10× that.
-4. Coalescing is deliberately absent (favors baselines) until T2's curve
-   exists — the small-message regime where Loom should shine is therefore
+1. **`endpoint-issue-overhead` value is bracketed, not measured**: 2400 ns
+   (literature, isolates initiation) to ~6900 ns (upper bound — an
+   end-to-end NVSHMEM put with only our assumed wire removed, so it also
+   absorbs their wire and NVSHMEM library overhead). Published anchors:
+   IBGDA inter-node scalar put ~7.5 µs one-way and intra-node 1.3–2.2 µs
+   (arXiv:2606.05951); NVSHMEM small-message 11.5–13.8 µs
+   (arXiv:2604.22126); DeepEP low-latency dispatch 77 µs @EP8 → 194 µs
+   @EP256. Note even the *intra-node* figure exceeds the 1015 ns
+   break-even, so the placeholder errs against Loom.
+2. **Phase C must measure COMPONENTS, not one end-to-end number** —
+   doorbell, WQE fetch over PCIe, NIC processing, HBM payload fetch, wire,
+   remote delivery. Loom's side is a constructed sum; comparing it against
+   a measured whole is apples-to-oranges, and an end-to-end put latency
+   already contains the wire that the model adds separately.
+3. `roce_stream = 150 ns` is the least-anchored placeholder; the Coyote
+   RoCE floor replaces it.
+4. Coalescing is deliberately absent (favours baselines) until T2's curve
+   exists — the small-message regime where Loom should shine is
    *understated* in all current results.
-5. Loom's dim1 advantage (1900 vs 3000 ns) now exceeds its dim0 penalty —
-   verify the matrix cells that flipped sign track this and not an artifact.
+5. **The SM model under-states its own tax**: `perf` is a `min()`, so only
+   compute-bound nodes are derated and memory-bound ops escape. Measured
+   compute gain is +13.2/+14.1% against the ideal 20/132 = 15.15%;
+   derating `local-mem-bw` by the same factor recovers exactly 15.15%.
+6. `fabric_latency` 500 ns / 64 GB/s models a PCIe5-class rack fabric,
+   **not** the 400 GB/s NVLink of a real HGX node. Equal-wires fairness
+   justifies giving both systems the same substrate, but the baseline is
+   then not a real DGX cluster — and since the dim0/dim1 balance drives
+   every overlap threshold, this deserves a hard look.
 
-## 6. Endpoint issue overhead (design doc, added 2026-08-04)
+## 6. Endpoint issue overhead (design)
 
 ### 6.1 The problem
 
-The baseline's per-operation RDMA initiation cost (`rdma_init`) was folded
-into dim1 `latency`. That is the wrong *kind* of quantity, and it is wrong
-in two measurable ways.
+The baseline's per-operation RDMA initiation cost was folded into dim1
+`latency`. That is the wrong *kind* of quantity, in two measurable ways.
 
 **It is occupancy, not latency.** A doorbell write, a WQE fetch across
-PCIe, and NIC command processing occupy the issuing path: the next
-operation cannot start until they are done. Link latency does not behave
-that way - it pipelines. In the analytical backend, `latency` is
-overlappable and `bandwidth` is the serializing resource, which we
-measured directly:
+PCIe and NIC command processing occupy the issuing path: the next
+operation cannot start until they finish. Link latency pipelines instead.
+In the analytical backend `latency` is overlappable and `bandwidth` is the
+serializing resource, measured directly:
 
 | representation of the same 2400 ns | 64 GPU all_reduce 1 MB |
 |---|---|
 | dim1 `latency` | Loom +40.48% |
-| effective-`bandwidth` derating | Loom -0.64% |
+| effective-`bandwidth` derating | Loom −0.64% |
 
-A 41-point swing from placement alone - larger than the uncertainty in the
-constant itself. Worse, `d(wall)/d(latency)` is exactly **0** for the
-64 GPU / 64 MB cell: charged as latency, the cost can vanish entirely.
+A 41-point swing from placement alone — larger than the uncertainty in the
+constant. And `d(wall)/d(latency)` is exactly **0** for the 64 GPU/64 MB
+cell: charged as latency, the cost can vanish entirely.
 
-**It was charged twice per point-to-point transfer.** Measured on p2p
-cross-rack 4 KB x 8: the latency representation adds `16 x 2400` over the
-wire-only baseline, i.e. twice per transfer (send leg and recv leg). An
-RDMA WRITE initiation is paid **once, by the sender**. Loom's dim1 latency
-was doubled identically, so the reported *gain percentages* survived, but
-both systems' absolute times were inflated about 2x.
+**It was charged twice per point-to-point transfer.** On p2p cross-rack
+4 KB × 8 the latency representation adds `16 × 2400` over the wire-only
+baseline — twice per transfer, send leg and recv leg. An RDMA WRITE
+initiation is paid once, by the sender. Loom's dim1 latency was doubled
+identically, so *gain percentages* survived while both systems' absolute
+times were inflated ~2×.
 
-Neither `latency` nor `bandwidth` can express a fixed per-message cost
-correctly across sizes: `latency` has the right magnitude but overlaps
-away, `bandwidth` serializes but is a rate, so it needs recalibrating for
-every message size (96% derate at 1 MB, 28% at 64 MB, for the same
-2400 ns). The analytical backend is missing a degree of freedom, not a
-calibration.
+Neither field can express a fixed per-message cost across sizes:
+`latency` has the right magnitude but overlaps away; `bandwidth`
+serializes but is a rate, needing recalibration per size (96% derate at
+1 MB, 28% at 64 MB, for the same 2400 ns). The backend is missing a degree
+of freedom, not a calibration.
 
-### 6.2 Why not another simulator
+### 6.2 Why not something else
 
-- **`endpoint-delay`** looks like the right knob and is not: it maps to
-  `communication_delay` and is passed to `MemBus`, the NPU<->memory
-  -accelerator bus, never to the network. Proven empirically - B3 with
-  `endpoint-delay: 1` and B1 with `10` produced byte-identical p2p results.
-- **LogGP `L/o/g/G`** are parsed by `Sys` - `o` is literally "per-message
-  overhead" - and also go to `MemBus`.
+- **`endpoint-delay`** looks right and is not: it maps to
+  `communication_delay` and is passed to `MemBus`, the NPU↔memory-
+  accelerator bus, never to the network. Proven empirically — B3 with
+  `endpoint-delay: 1` and B1 with `10` gave byte-identical p2p results.
+- **LogGP `L/o/g/G`** are parsed by `Sys` — `o` is literally "per-message
+  overhead" — and also go to `MemBus`.
 - **ns-3 backend** models the wire, not the host: `rdma-hw` exposes only
-  congestion control and link-layer knobs (`CcMode`/DCQCN, `Mtu`, PFC,
+  congestion-control and link-layer knobs (`CcMode`/DCQCN, `Mtu`, PFC,
   rate control). Grepping its RDMA path for doorbell/WQE/post_send returns
   nothing; `AddQueuePair` starts sending immediately. It would also force
-  the scale-up fabric to be modelled as Ethernet, since it has no
-  NVLink/PCIe link model, and one backend serves the whole network.
-- **Garnet** is not present in this checkout (the build script references a
+  the scale-up fabric to be modelled as Ethernet — it has no NVLink or
+  PCIe link model — and one backend serves the whole network.
+- **Garnet** is absent from this checkout (the build script references a
   missing submodule) and is an on-chip NoC model regardless.
 - **SST/Ember, LogGOPSim, SimGrid** do model endpoint overhead as
   first-class LogGP `o`, but adopting one means abandoning Chakra ETs, STG
   workloads, the harness and the 512-GPU scale sweep.
 
-### 6.3 The mechanism used
+### 6.3 Mechanism
 
-`Sys::sim_send(Tick delay, ...)` already defers injection when `delay != 0`,
-and is plumbed through every send path with every caller passing 0:
+`Sys::sim_send(Tick delay, ...)` already defers injection when
+`delay != 0`, plumbed through every send path with every caller passing 0:
 
 ```cpp
 if (delay == 0)  comm_NI->sim_send(...);                  // immediate
 else             try_register_event(new SimSendCaller(...), ..., delay);
 ```
 
-Deferring the injection puts the cost on the **issuing stream's** critical
-path while concurrent streams (`active-chunks-per-dimension`) still
-overlap. That is *partially pipelined*, which is how GPU-initiated RDMA
-actually behaves - several operations in flight, each costing issue time -
-and it sits between the two extremes of the latency and bandwidth
-representations rather than at either.
+Deferring injection puts the cost on the **issuing stream's** critical path
+while concurrent streams (`active-chunks-per-dimension`) still overlap —
+*partially pipelined*, which is how GPU-initiated RDMA behaves, and which
+sits between the latency and bandwidth extremes rather than at either.
 
 ### 6.4 Interface
-
-Per-dimension array in the system JSON, mirroring how collective
-implementations are already configured:
 
 ```json
 "endpoint-issue-overhead": [0, 2400]
 ```
 
-| system | value | meaning |
-|---|---|---|
-| Loom | `[0, 0]` | a store; no transport software on the issue path |
-| B1 GPU-initiated RDMA | `[0, 2400]` | doorbell + WQE + NIC command processing |
-| B2 CPU-proxy RDMA | `[0, 2800]` | as B1, plus host post/poll |
+Per-dimension array. dim0 is always 0 — an in-rack peer access is a plain
+store for every system. Absent key == all zeros, so the hook is inert
+unless configured. Consequence: baseline dim1 latency is now the **wire
+only** (600 ns); `--rdma-init-ns` survives with default 0 purely so the old
+representation can be reproduced for the bracket.
 
-dim0 is always 0: an in-rack peer access is a plain store for every system.
-Absent key == all zeros, so the hook is inert unless configured.
-
-Consequence for the network YAML: baseline dim1 latency is now the **wire
-only** (600 ns). `--rdma-init-ns` survives with default 0 purely so the old
-latency representation can be reproduced for the latency-vs-overhead
-bracket.
-
-### 6.5 Implementation notes
+### 6.5 Implementation note
 
 The dimension is derived from **src/dst coordinates**, not
 `request->vnet`. The point-to-point path (`Workload.cc:405`) builds a
 `sim_request` with `srcRank`/`dstRank`/`reqType` and never sets `vnet`, so
-reading it there is undefined behaviour - the first version of this patch
-had exactly that bug, and it silently charged nothing on the p2p path.
-Coordinates work for collectives and p2p alike:
+reading it there is undefined behaviour — the first version of this patch
+had that bug and silently charged nothing on the p2p path.
 
 ```
 for each dim d:  if (src % dims[d]) != (dst % dims[d])  crossed = d
@@ -333,24 +352,20 @@ for each dim d:  if (src % dims[d]) != (dst % dims[d])  crossed = d
 
 ### 6.6 Validation gates
 
-1. **Null**: key absent == `[0,0]` == prior `rdma_init=0` result. PASSES
-   (57,195 three ways). The hook is inert when unset.
-2. **In-rack**: unaffected, since dim0 is charged 0. PASSES (8,472 both).
-3. **Collective divergence**: the two representations must now differ.
-   PASSES (64 GPU 1 MB: 191,595 as latency vs 124,395 as overhead).
-4. **Single-message equivalence**: deliberately NOT expected to hold - see
-   6.1, the latency representation double-charges p2p. The overhead
-   representation charges once, which is the correct semantics.
-5. **Hiding**: at 64 GPU / 64 MB the overhead is absorbed exactly as the
-   latency was (909,088 at overhead 0, 2400 and 4800). Same conclusion
-   under both representations, so **that tie is structural - a dim0-bound
-   cell - and not an artifact of the representation.**
+1. **Null**: key absent == `[0,0]` == prior `rdma_init=0`. PASSES (57,195
+   three ways) — the hook is inert when unset.
+2. **In-rack**: unaffected, dim0 charged 0. PASSES (8,472 both).
+3. **Collective divergence**: representations must differ. PASSES
+   (64 GPU 1 MB: 191,595 latency vs 124,395 overhead).
+4. **Single-message equivalence**: deliberately NOT expected to hold — the
+   latency representation double-charges p2p (§6.1). The overhead
+   representation charges once, which is correct.
+5. **Hiding**: at 64 GPU/64 MB the overhead is absorbed exactly as the
+   latency was (909,088 at overhead 0, 2400, 4800). Same conclusion under
+   both representations, so **that tie is structural — a dim0-bound cell —
+   not an artifact of the representation.**
 
 ### 6.7 What this does not fix
 
-The *value* is still unmeasured. `rdma_init` remains bracketed between
-2400 ns (literature-derived, isolates initiation) and ~6900 ns (upper
-bound: an end-to-end NVSHMEM put with only our assumed wire removed, so it
-also absorbs their wire and NVSHMEM library overhead). This change fixes
-*where* the cost is charged and *how it composes*, not what it is. Phase C
-must still decompose B1 with the same discipline as Loom's side.
+The *value* is still unmeasured (§5.1). This change fixes **where** the
+cost is charged and **how it composes**, not what it is.
