@@ -134,8 +134,8 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
             local_send(src_id, dst_id, message_size, msg_handler, fun_arg, tag);
             return 0;
         }
-        // Trigger ns3 to schedule RDMA QP event.
-        send_flow(src_id, dst_id, message_size, msg_handler, fun_arg, tag);
+        // Trigger ns3 to schedule RDMA QP events (one per put).
+        split_send(src_id, dst_id, message_size, msg_handler, fun_arg, tag);
         return 0;
     }
 

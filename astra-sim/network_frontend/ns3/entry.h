@@ -342,6 +342,32 @@ void local_send(int src, int dst, uint64_t size, void (*msg_handler)(void *fun_a
                       &notify_receiver_receive_data, src, dst, (int)size, tag);
 }
 
+// loom branch: a message split into puts (MSG_SPLIT_BYTES); the sender is done
+// when all its puts are, the receiver counts bytes per tag as before
+struct SplitSend {
+  int left;
+  void (*msg_handler)(void *fun_arg);
+  void *fun_arg;
+};
+void split_put_done(void *arg) {
+  SplitSend *s = (SplitSend *)arg;
+  if (--s->left == 0) {
+    s->msg_handler(s->fun_arg);
+    delete s;
+  }
+}
+void split_send(int src, int dst, uint64_t size, void (*msg_handler)(void *fun_arg),
+                void *fun_arg, int tag) {
+  if (msg_split_bytes == 0 || size <= msg_split_bytes) {
+    send_flow(src, dst, size, msg_handler, fun_arg, tag);
+    return;
+  }
+  uint64_t n = (size + msg_split_bytes - 1) / msg_split_bytes;
+  SplitSend *s = new SplitSend{(int)n, msg_handler, fun_arg};
+  for (uint64_t i = 0; i < n; i++)
+    send_flow(src, dst, min(msg_split_bytes, size - i * msg_split_bytes), split_put_done, s, tag);
+}
+
 bool same_server(int a, int b) {
   return gpus_per_server > 0 && a / (int)gpus_per_server == b / (int)gpus_per_server;
 }
