@@ -122,6 +122,20 @@ map<MsgEventKey, queue<MsgEvent>> sim_recv_waiting_hash;
 //   System layer has not yet called sim_recv
 map<MsgEventKey, int> received_msg_standby_hash;
 
+// loom branch: with a host interface, sender release, receiver delivery and the
+// end of the qp (last ACK) happen at different times; forget a flow after all three
+struct FlowState {
+  bool snd = false, rcv = false, qp = false;
+};
+map<pair<int, pair<int, int>>, FlowState> flow_state;
+void flow_maybe_done(pair<int, pair<int, int>> key) {
+  auto it = flow_state.find(key);
+  if (it != flow_state.end() && it->second.snd && it->second.rcv && it->second.qp) {
+    flow_state.erase(it);
+    sender_src_port_map.erase(key);
+  }
+}
+
 // send_flow commands the ns3 simulator to schedule a RDMA message to be sent
 // between two pair of nodes. send_flow is triggered by sim_send.
 void send_flow(int src_id, int dst, int maxPacketCount,
@@ -129,6 +143,7 @@ void send_flow(int src_id, int dst, int maxPacketCount,
   // Get a new port number.
   uint32_t port = portNumber[src_id][dst]++;
   sender_src_port_map[make_pair(port, make_pair(src_id, dst))] = tag;
+  flow_state[make_pair(port, make_pair(src_id, dst))] = FlowState();
   int pg = 3, dport = 100;
   flow_input.idx++;
 
@@ -274,13 +289,61 @@ void qp_finish(FILE *fout, Ptr<RdmaQueuePair> q) {
     exit(-1);
   }
   int tag = sender_src_port_map[make_pair(q->sport, make_pair(sid, did))];
+  if (g_hostIf.mode != HostIfConfig::NONE) {
+    // host interface (loom branch): RdmaHw releases sender and receiver itself
+    flow_state[make_pair(q->sport, make_pair(sid, did))].qp = true;
+    flow_maybe_done(make_pair(q->sport, make_pair(sid, did)));
+    return;
+  }
   sender_src_port_map.erase(make_pair(q->sport, make_pair(sid, did)));
+  flow_state.erase(make_pair(q->sport, make_pair(sid, did)));
 
   // Let sender knows that the flow has finished.
   notify_sender_sending_finished(sid, did, q->m_size, tag, q->sport);
 
   // Let receiver knows that it has received packets.
   notify_receiver_receive_data(sid, did, q->m_size, tag);
+}
+
+// loom branch: the sender is released (pull: CQE seen, push: writes left the GPU)
+void hif_sender_done(Ptr<RdmaQueuePair> q) {
+  int sid = ip_to_node_id(q->sip), did = ip_to_node_id(q->dip);
+  auto key = make_pair((int)q->sport, make_pair(sid, did));
+  flow_state[key].snd = true;
+  notify_sender_sending_finished(sid, did, q->m_size, sender_src_port_map[key], q->sport);
+  flow_maybe_done(key);
+}
+
+// loom branch: the whole message is in the receiver's memory
+void hif_rx_done(uint32_t sip, uint32_t dip, uint16_t sport, uint64_t size) {
+  int sid = ip_to_node_id(Ipv4Address(sip)), did = ip_to_node_id(Ipv4Address(dip));
+  auto key = make_pair((int)sport, make_pair(sid, did));
+  flow_state[key].rcv = true;
+  notify_receiver_receive_data(sid, did, size, sender_src_port_map[key]);
+  flow_maybe_done(key);
+}
+
+// loom branch: a message between two GPUs of one server takes NVLink, not
+// ns-3: it holds the sender's and the receiver's NVLink port for size / bw
+// (the NVSwitch itself does not block); the receiver has it nvlink_lat_ns later.
+vector<uint64_t> nvl_tx_free, nvl_rx_free;
+void local_send(int src, int dst, uint64_t size, void (*msg_handler)(void *fun_arg),
+                void *fun_arg, int tag) {
+  if (nvl_tx_free.size() <= (size_t)max(src, dst)) {
+    nvl_tx_free.resize(max(src, dst) + 1, 0);
+    nvl_rx_free.resize(max(src, dst) + 1, 0);
+  }
+  uint64_t now = Simulator::Now().GetNanoSeconds();
+  uint64_t start = max(now, max(nvl_tx_free[src], nvl_rx_free[dst]));
+  uint64_t end = start + (uint64_t)ceil(size / nvlink_gbps); // GB/s = B/ns
+  nvl_tx_free[src] = nvl_rx_free[dst] = end;
+  Simulator::Schedule(NanoSeconds(end - now), msg_handler, fun_arg);
+  Simulator::Schedule(NanoSeconds(end + (uint64_t)nvlink_lat_ns - now),
+                      &notify_receiver_receive_data, src, dst, (int)size, tag);
+}
+
+bool same_server(int a, int b) {
+  return gpus_per_server > 0 && a / (int)gpus_per_server == b / (int)gpus_per_server;
 }
 
 int setup_ns3_simulation(string network_configuration) {
@@ -292,6 +355,8 @@ int setup_ns3_simulation(string network_configuration) {
   if (!SetupNetwork(qp_finish)) {
     return -1;
   }
+  RdmaHw::s_hifSenderDone = hif_sender_done;
+  RdmaHw::s_hifRxDone = hif_rx_done;
 
   return 0;
 

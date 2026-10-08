@@ -129,6 +129,11 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                          void* fun_arg) {
         int src_id = rank;
 
+        if (same_server(src_id, dst_id)) {
+            // NVLink inside the server, not ns-3 (loom branch)
+            local_send(src_id, dst_id, message_size, msg_handler, fun_arg, tag);
+            return 0;
+        }
         // Trigger ns3 to schedule RDMA QP event.
         send_flow(src_id, dst_id, message_size, msg_handler, fun_arg, tag);
         return 0;
