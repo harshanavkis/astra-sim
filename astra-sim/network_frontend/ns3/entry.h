@@ -121,6 +121,8 @@ map<MsgEventKey, queue<MsgEvent>> sim_recv_waiting_hash;
 //   - value: The number of bytes that ns3 has simulated completed, but the
 //   System layer has not yet called sim_recv
 map<MsgEventKey, int> received_msg_standby_hash;
+// loom branch: per rank, when its last send was released and its last message arrived (ns)
+map<int, uint64_t> rank_last_release, rank_last_recv;
 
 // loom branch: with a host interface, sender release, receiver delivery and the
 // end of the qp (last ACK) happen at different times; forget a flow after all three
@@ -179,6 +181,7 @@ void notify_receiver_receive_data(int src_id,
 
     MsgEventKey recv_expect_event_key =
         make_pair(tag, make_pair(src_id, dst_id));
+    rank_last_recv[dst_id] = Simulator::Now().GetNanoSeconds();
 
     int remaining_bytes = message_size;
     auto waiting_it = sim_recv_waiting_hash.find(recv_expect_event_key);
@@ -337,7 +340,10 @@ void local_send(int src, int dst, uint64_t size, void (*msg_handler)(void *fun_a
   uint64_t start = max(now, max(nvl_tx_free[src], nvl_rx_free[dst]));
   uint64_t end = start + (uint64_t)ceil(size / nvlink_gbps); // GB/s = B/ns
   nvl_tx_free[src] = nvl_rx_free[dst] = end;
-  Simulator::Schedule(NanoSeconds(end - now), msg_handler, fun_arg);
+  Simulator::Schedule(NanoSeconds(end - now), [src, msg_handler, fun_arg]() {
+    rank_last_release[src] = Simulator::Now().GetNanoSeconds();
+    msg_handler(fun_arg);
+  });
   Simulator::Schedule(NanoSeconds(end + (uint64_t)nvlink_lat_ns - now),
                       &notify_receiver_receive_data, src, dst, (int)size, tag);
 }
@@ -393,6 +399,7 @@ void nic_sender_done(uint64_t id) {
     return;
   NicMsg &m = it->second;
   m.released = true;
+  rank_last_release[m.src] = Simulator::Now().GetNanoSeconds();
   node_to_bytes_sent_map[make_pair(m.src, 0)] += m.size;
   auto h = m.handler;
   auto a = m.fun_arg;
@@ -415,22 +422,54 @@ void nic_cqe(Ptr<RdmaQueuePair> qp, uint64_t wqe, uint64_t id) {
 void nic_rx(uint32_t src, uint32_t dst, uint16_t sport, uint64_t id, bool atomic) {
   nic_receiver_done(id);
 }
-void nic_send(int src, int dst, uint64_t size, void (*msg_handler)(void *fun_arg), void *fun_arg, int tag) {
-  Ptr<RdmaHw> hw = n.Get(src)->GetObject<RdmaDriver>()->m_rdma;
-  Ptr<RdmaQueuePair> qp = hw->NicQp(dst, serverAddress[src], serverAddress[dst], 0);
-  uint64_t put = msg_split_bytes ? msg_split_bytes : size;
-  for (uint64_t off = 0; off < size; off += put) {
-    hw->NicPost(qp, min(put, size - off), false, 0); // data puts: id 0, nobody waits on them alone
-    hw->NicRing(qp);
-  }
-  uint64_t id = nic_next_id++;
-  nic_msgs[id] = NicMsg{src, dst, tag, size, msg_handler, fun_arg, false, false};
+// The sends one GPU issues at the same time are posted interleaved, one put of each in turn (a
+// GPU's warps post every destination's tokens side by side, not one destination after another);
+// each send's signal right after its own last put.
+struct NicPending {
+  int dst;
+  uint64_t size, off, id;
+};
+map<int, vector<NicPending> > nic_pending; // src -> sends to post at this time
+void nic_post_signal(Ptr<RdmaHw> hw, Ptr<RdmaQueuePair> qp, uint64_t id) {
   hw->NicPost(qp, 8, false, id); // the signal, behind the data
   hw->NicRing(qp);
   if (g_hostIf.push) // Loom: released once the signal store (behind every data store) is out of the GPU
     Simulator::Schedule(qp->nic_out - Simulator::Now(), &nic_sender_done, id);
   else if (g_hostIf.release_on_post)
     Simulator::ScheduleNow(&nic_sender_done, id);
+}
+void nic_flush(int src) {
+  Ptr<RdmaHw> hw = n.Get(src)->GetObject<RdmaDriver>()->m_rdma;
+  vector<NicPending> v;
+  v.swap(nic_pending[src]);
+  for (bool more = true; more;) {
+    more = false;
+    for (auto &p : v) {
+      if (p.off > p.size)
+        continue; // done, signal posted
+      Ptr<RdmaQueuePair> qp = hw->NicQp(p.dst, serverAddress[src], serverAddress[p.dst], 0);
+      if (p.off < p.size) {
+        uint64_t put = msg_split_bytes ? msg_split_bytes : p.size;
+        uint64_t b = min(put, p.size - p.off);
+        hw->NicPost(qp, b, false, 0); // data puts: id 0, nobody waits on them alone
+        hw->NicRing(qp);
+        p.off += b;
+      }
+      if (p.off == p.size) {
+        nic_post_signal(hw, qp, p.id);
+        p.off = p.size + 1;
+      } else
+        more = true;
+    }
+  }
+}
+void nic_send(int src, int dst, uint64_t size, void (*msg_handler)(void *fun_arg), void *fun_arg, int tag) {
+  uint64_t id = nic_next_id++;
+  nic_msgs[id] = NicMsg{src, dst, tag, size, msg_handler, fun_arg, false, false};
+  auto &v = nic_pending[src];
+  if (v.empty())
+    Simulator::ScheduleNow(&nic_flush, src);
+  v.push_back(NicPending{dst, size, 0, id});
 }
 bool same_server(int a, int b) {
   return gpus_per_server > 0 && a / (int)gpus_per_server == b / (int)gpus_per_server;

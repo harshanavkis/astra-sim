@@ -11,6 +11,13 @@ using namespace std;
 using namespace AstraSim;
 using namespace Chakra;
 
+// loom branch: ASTRA_CONCURRENT_SENDS=1 lets point-to-point sends run side by side, like receives
+// (a GPU-initiated send is a post; the GPU's warps post many at once). Default: upstream.
+static bool concurrent_sends() {
+    static const bool on = getenv("ASTRA_CONCURRENT_SENDS") && atoi(getenv("ASTRA_CONCURRENT_SENDS"));
+    return on;
+}
+
 typedef ChakraProtoMsg::NodeType ChakraNodeType;
 
 HardwareResource::HardwareResource(uint32_t num_npus, int sys_id)
@@ -48,7 +55,8 @@ void HardwareResource::occupy(
             // gpu_ops_node = node;
             gpu_ops_node.emplace(node->id());
         } else {
-            if (node->type() == ChakraNodeType::COMM_RECV_NODE) {
+            if (node->type() == ChakraNodeType::COMM_RECV_NODE ||
+                (concurrent_sends() && node->type() == ChakraNodeType::COMM_SEND_NODE)) {
                 return;
             }
             assert(num_in_flight_gpu_comm_ops == 0);
@@ -72,7 +80,8 @@ void HardwareResource::release(
             assert(num_in_flight_gpu_comp_ops == 0);
             this->gpu_ops_node.erase(node->id());
         } else {
-            if (node->type() == ChakraNodeType::COMM_RECV_NODE) {
+            if (node->type() == ChakraNodeType::COMM_RECV_NODE ||
+                (concurrent_sends() && node->type() == ChakraNodeType::COMM_SEND_NODE)) {
                 return;
             }
             --num_in_flight_gpu_comm_ops;
@@ -101,7 +110,8 @@ bool HardwareResource::is_available(
             if (num_in_flight_gpu_comm_ops == 0) {
                 return true;
             } else {
-                if (node->type() == ChakraNodeType::COMM_RECV_NODE) {
+                if (node->type() == ChakraNodeType::COMM_RECV_NODE ||
+                    (concurrent_sends() && node->type() == ChakraNodeType::COMM_SEND_NODE)) {
                     return true;
                 }
                 if (num_in_flight_gpu_comm_ops == 0) {

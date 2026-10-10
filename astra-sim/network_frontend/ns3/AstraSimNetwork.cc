@@ -95,6 +95,11 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
             }
         }
         */
+        // loom branch: the rank's last send released (sender busy) and last message received
+        printf("loom_rank %d sends_released_ns %lu last_recv_ns %lu finished_ns %lu\n", rank,
+               (unsigned long)rank_last_release[rank], (unsigned long)rank_last_recv[rank],
+               (unsigned long)Simulator::Now().GetNanoSeconds());
+        fflush(stdout);
         completion_tracker_->mark_rank_as_finished(rank);
         return;
     }
