@@ -368,6 +368,70 @@ void split_send(int src, int dst, uint64_t size, void (*msg_handler)(void *fun_a
     send_flow(src, dst, min(msg_split_bytes, size - i * msg_split_bytes), split_put_done, s, tag);
 }
 
+// loom branch, HOST_IF_MODE nic (rdma-hw.cc nic mode): a cross-server message on one QP per
+// (src, dst): puts of MSG_SPLIT_BYTES (0 = one put), each rung as it is posted (the GPU posts at no
+// cost), then an 8 B signal write behind them on the same QP. The receiver has the message when it
+// sees the signal. The sender may reuse its buffer: RDMA (NIC_PUSH 0) when it sees the signal's CQE
+// (SENDER_RELEASE cqe, the default) or at once (SENDER_RELEASE post); Loom (NIC_PUSH 1) when its
+// stores, the signal behind the data, have left the GPU.
+struct NicMsg {
+  int src, dst, tag;
+  uint64_t size;
+  void (*handler)(void *fun_arg);
+  void *fun_arg;
+  bool released, received;
+};
+unordered_map<uint64_t, NicMsg> nic_msgs; // signal id -> message, until released and received
+uint64_t nic_next_id = 1;
+void nic_forget(unordered_map<uint64_t, NicMsg>::iterator it) {
+  if (it->second.released && it->second.received)
+    nic_msgs.erase(it);
+}
+void nic_sender_done(uint64_t id) {
+  auto it = nic_msgs.find(id);
+  if (it == nic_msgs.end() || it->second.released)
+    return;
+  NicMsg &m = it->second;
+  m.released = true;
+  node_to_bytes_sent_map[make_pair(m.src, 0)] += m.size;
+  auto h = m.handler;
+  auto a = m.fun_arg;
+  nic_forget(it);
+  h(a);
+}
+void nic_receiver_done(uint64_t id) {
+  auto it = nic_msgs.find(id);
+  if (it == nic_msgs.end() || it->second.received)
+    return;
+  it->second.received = true;
+  NicMsg m = it->second;
+  nic_forget(it);
+  notify_receiver_receive_data(m.src, m.dst, (int)m.size, m.tag);
+}
+void nic_cqe(Ptr<RdmaQueuePair> qp, uint64_t wqe, uint64_t id) {
+  if (!g_hostIf.push && !g_hostIf.release_on_post)
+    nic_sender_done(id);
+}
+void nic_rx(uint32_t src, uint32_t dst, uint16_t sport, uint64_t id, bool atomic) {
+  nic_receiver_done(id);
+}
+void nic_send(int src, int dst, uint64_t size, void (*msg_handler)(void *fun_arg), void *fun_arg, int tag) {
+  Ptr<RdmaHw> hw = n.Get(src)->GetObject<RdmaDriver>()->m_rdma;
+  Ptr<RdmaQueuePair> qp = hw->NicQp(dst, serverAddress[src], serverAddress[dst], 0);
+  uint64_t put = msg_split_bytes ? msg_split_bytes : size;
+  for (uint64_t off = 0; off < size; off += put) {
+    hw->NicPost(qp, min(put, size - off), false, 0); // data puts: id 0, nobody waits on them alone
+    hw->NicRing(qp);
+  }
+  uint64_t id = nic_next_id++;
+  nic_msgs[id] = NicMsg{src, dst, tag, size, msg_handler, fun_arg, false, false};
+  hw->NicPost(qp, 8, false, id); // the signal, behind the data
+  hw->NicRing(qp);
+  if (g_hostIf.push) // Loom: released once the signal store (behind every data store) is out of the GPU
+    Simulator::Schedule(qp->nic_out - Simulator::Now(), &nic_sender_done, id);
+  else if (g_hostIf.release_on_post)
+    Simulator::ScheduleNow(&nic_sender_done, id);
+}
 bool same_server(int a, int b) {
   return gpus_per_server > 0 && a / (int)gpus_per_server == b / (int)gpus_per_server;
 }
@@ -383,6 +447,8 @@ int setup_ns3_simulation(string network_configuration) {
   }
   RdmaHw::s_hifSenderDone = hif_sender_done;
   RdmaHw::s_hifRxDone = hif_rx_done;
+  RdmaHw::s_nicCqe = nic_cqe;
+  RdmaHw::s_nicRx = nic_rx;
 
   return 0;
 
