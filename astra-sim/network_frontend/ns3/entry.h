@@ -326,25 +326,19 @@ void hif_rx_done(uint32_t sip, uint32_t dip, uint16_t sport, uint64_t size) {
   flow_maybe_done(key);
 }
 
-// loom branch: a message between two GPUs of one server takes NVLink, not
-// ns-3: it holds the sender's and the receiver's NVLink port for size / bw
-// (the NVSwitch itself does not block); the receiver has it nvlink_lat_ns later.
-vector<uint64_t> nvl_tx_free, nvl_rx_free;
+// loom branch: a message between two GPUs of one server takes NVLink, not ns-3, and is modelled by its bandwidth
+// only: it takes size / nvlink_gbps and arrives nvlink_lat_ns later, independent of other messages (no port, no
+// queue; as ASTRA-sim's congestion-unaware analytical backend). Identical for RDMA and Loom. (Until 2026-10-20 each
+// GPU's NVLink port was reserved message by message in issue order; that queue made results depend on issue order,
+// which differs between the systems: PP8 Loom +13% from in-server queueing alone. Owner: model only its bandwidth.)
 void local_send(int src, int dst, uint64_t size, void (*msg_handler)(void *fun_arg),
                 void *fun_arg, int tag) {
-  if (nvl_tx_free.size() <= (size_t)max(src, dst)) {
-    nvl_tx_free.resize(max(src, dst) + 1, 0);
-    nvl_rx_free.resize(max(src, dst) + 1, 0);
-  }
-  uint64_t now = Simulator::Now().GetNanoSeconds();
-  uint64_t start = max(now, max(nvl_tx_free[src], nvl_rx_free[dst]));
-  uint64_t end = start + (uint64_t)ceil(size / nvlink_gbps); // GB/s = B/ns
-  nvl_tx_free[src] = nvl_rx_free[dst] = end;
-  Simulator::Schedule(NanoSeconds(end - now), [src, msg_handler, fun_arg]() {
+  uint64_t dur = (uint64_t)ceil(size / nvlink_gbps); // GB/s = B/ns
+  Simulator::Schedule(NanoSeconds(dur), [src, msg_handler, fun_arg]() {
     rank_last_release[src] = Simulator::Now().GetNanoSeconds();
     msg_handler(fun_arg);
   });
-  Simulator::Schedule(NanoSeconds(end + (uint64_t)nvlink_lat_ns - now),
+  Simulator::Schedule(NanoSeconds(dur + (uint64_t)nvlink_lat_ns),
                       &notify_receiver_receive_data, src, dst, (int)size, tag);
 }
 
