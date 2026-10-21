@@ -1,0 +1,11 @@
+workload	cluster	variant	started	ranks_done	iter_ns	exposed_comm_ns	sim_progress_ns	wall	status	log
+llama3_70b	c16	none	20261008_114034	0			135979815198		running	/scratch/harshanavkis/loom-proj/e8-astrasim/runs/ns3_e8__llama3_70b__c16__none_20261008_114034.log
+llama3_70b	c16	pull	20261008_114034	0			114366783460		running	/scratch/harshanavkis/loom-proj/e8-astrasim/runs/ns3_e8__llama3_70b__c16__pull_20261008_114034.log
+llama3_70b	c16	pull_deepep	20261008_114034	0			114992904753		running	/scratch/harshanavkis/loom-proj/e8-astrasim/runs/ns3_e8__llama3_70b__c16__pull_deepep_20261008_114034.log
+llama3_70b	c16	pull_nvshmem	20261008_114034	0			117855794361		running	/scratch/harshanavkis/loom-proj/e8-astrasim/runs/ns3_e8__llama3_70b__c16__pull_nvshmem_20261008_114034.log
+llama3_70b	c16	push	20261008_114034	0			108242431061		running	/scratch/harshanavkis/loom-proj/e8-astrasim/runs/ns3_e8__llama3_70b__c16__push_20261008_114034.log
+mixtral8x22b	c32	none	20261008_113333	32	14440866545	12677388672	14332423730		done	/scratch/harshanavkis/loom-proj/e8-astrasim/runs/ns3_e8__mixtral8x22b__c32__none_20261008_113333.log
+mixtral8x22b	c32	pull	20261008_113333	32	14438769499	12677383527	14331536481		done	/scratch/harshanavkis/loom-proj/e8-astrasim/runs/ns3_e8__mixtral8x22b__c32__pull_20261008_113333.log
+mixtral8x22b	c32	pull_deepep	20261008_113333	32	14439054428	12676777580	14331336893		done	/scratch/harshanavkis/loom-proj/e8-astrasim/runs/ns3_e8__mixtral8x22b__c32__pull_deepep_20261008_113333.log
+mixtral8x22b	c32	pull_nvshmem	20261008_113333	32	14440404861	12676355907	14331934473		done	/scratch/harshanavkis/loom-proj/e8-astrasim/runs/ns3_e8__mixtral8x22b__c32__pull_nvshmem_20261008_113333.log
+mixtral8x22b	c32	push	20261008_113333	32	14441005157	12677423973	14332534741		done	/scratch/harshanavkis/loom-proj/e8-astrasim/runs/ns3_e8__mixtral8x22b__c32__push_20261008_113333.log

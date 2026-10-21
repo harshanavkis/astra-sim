@@ -1,0 +1,19 @@
+key	label	variant	iter_ms	exposed_ms	gpus	log
+dp	DP	rdma	83.038	31.095	64	an_e2e_dp__n64nm__rdma_20261021_063111.log
+dp	DP	loom	82.921	30.979	64	an_e2e_dp__n64nm__loom_20261021_063111.log
+fsdp	FSDP	rdma	83.870	31.967	64	an_e2e_fsdp__n64nm__rdma_20261021_063111.log
+fsdp	FSDP	loom	83.762	31.859	64	an_e2e_fsdp__n64nm__loom_20261021_063111.log
+pp	PP	rdma	213.167	115.715	64	an_e2e_pp__n64nm__rdma_20261021_063111.log
+pp	PP	loom	213.118	115.665	64	an_e2e_pp__n64nm__loom_20261021_063111.log
+cp	CP	rdma	78.492	65.236	64	an_e2e_cp__n64nm__rdma_20261021_063111.log
+cp	CP	loom	78.263	65.007	64	an_e2e_cp__n64nm__loom_20261021_063111.log
+hybrid	TP+PP+DP	rdma	187.831	95.555	64	an_e2e_hybrid__n64nm__rdma_20261021_063111.log
+hybrid	TP+PP+DP	loom	186.918	94.642	64	an_e2e_hybrid__n64nm__loom_20261021_063111.log
+l80	Llama-80B	rdma	981.041	798.369	128	an_e2e_l80__n128nm__rdma_20261021_063111.log
+l80	Llama-80B	loom	980.978	798.306	128	an_e2e_l80__n128nm__loom_20261021_063111.log
+moe_mixed	MoE EP+TP+DP	rdma	141.316	133.181	64	an_pilotfix_opus_mixed_ep64__n64nm__rdma_20261021_063111.log
+moe_mixed	MoE EP+TP+DP	loom	141.294	133.159	64	an_pilotfix_opus_mixed_ep64__n64nm__loom_20261021_063111.log
+moe_scaleout	MoE EP+DP	rdma	985.366	926.157	64	an_pilotfix_opus_scaleout_ep8__n64nm__rdma_20261021_063111.log
+moe_scaleout	MoE EP+DP	loom	985.335	926.126	64	an_pilotfix_opus_scaleout_ep8__n64nm__loom_20261021_063111.log
+depth16	DP, 16 layers	rdma	345.420	137.733	64	an_e2e_depth16__n64nm__rdma_20261021_063111.log
+depth16	DP, 16 layers	loom	344.937	137.251	64	an_e2e_depth16__n64nm__loom_20261021_063111.log

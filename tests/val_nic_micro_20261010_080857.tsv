@@ -1,0 +1,10 @@
+check	measured_us	model_us	err_pct
+nic_post inline BF	2.02	2.02	-0.1
+nic_post host BF	2.68	2.69	+0.3
+nic_post gpu BF	3.37	3.37	-0.1
+nic_post inline doorbell	2.71	2.69	-0.8
+nic_post host doorbell	3.39	3.36	-0.9
+nic_post gpu doorbell	4.05	4.04	-0.3
+perftest 8 B host write one-way	1.42	1.42	+0.0
+DeepEP put 8 B -> CQE	5.45	5.45	-0.0
+DeepEP put 7168 B -> CQE (prediction)	6.13	5.68	-7.3

@@ -1,0 +1,5 @@
+op	EP	measured_us	model_mean_us	model_max_us
+dispatch	8	77	42.1	50.7
+combine	8	114	80.7	97.3
+dispatch	16	118	103.1	122.4
+combine	16	195	176.9	196.2

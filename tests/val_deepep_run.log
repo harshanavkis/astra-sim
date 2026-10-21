@@ -1,0 +1,10 @@
+op	EP	measured_us	model_mean_us	model_max_us
+dispatch	32	155	133.1	142.9
+combine	32	273	248.8	262.2
+dispatch	64	173	148.3	153.9
+combine	64	314	278.1	285.6
+dispatch	128	192	155.8	160.3
+combine	128	369	293.6	297.5
+dispatch	256	194	160.6	162.5
+combine	256	360	302.7	304.8
+tsv: /scratch/harshanavkis/loom-proj/e8-astrasim/tests/val_deepep_20261009_203128.tsv

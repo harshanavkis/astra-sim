@@ -1,0 +1,13 @@
+op	tokens	what	local_meas	ordered_meas	ordered_model	flush_meas	flush_model	push250_model	push1000_model
+dispatch	1	seen	4.86	18.18	16.75	30.21	30.48	6.05	5.97
+dispatch	1	arr_last	3.33	16.90	15.43	20.48	19.00	4.88	4.80
+dispatch	16	seen	5.38	38.53	38.11	47.36	47.37	29.39	29.31
+dispatch	16	arr_last	3.84	36.99	36.78	37.76	36.72	29.39	29.31
+dispatch	128	seen	12.54	213.25	212.11	220.93	220.81	203.01	202.93
+dispatch	128	arr_last	11.01	211.97	210.81	210.94	210.47	203.01	202.93
+combine	1	seen	3.58	19.20	18.51	30.20	30.48	6.25	6.17
+combine	1	arr_last	2.17	17.92	17.19	15.23	15.08	6.25	6.17
+combine	16	seen	6.14	65.28	64.73	74.88	75.02	55.48	55.40
+combine	16	arr_last	4.61	64.13	63.41	65.54	65.12	55.48	55.40
+combine	128	seen	27.65	416.00	414.02	450.05	450.32	402.98	402.89
+combine	128	arr_last	26.11	414.72	412.70	440.57	427.87	402.98	402.89
