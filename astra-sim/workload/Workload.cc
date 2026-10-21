@@ -158,6 +158,13 @@ void Workload::issue(shared_ptr<Chakra::FeederV3::ETFeederNode> node) {
                       static_cast<uint64_t>(node->type()));
     }
 
+    // loom branch: ASTRA_ISSUE_LOG=<file>: one line per issued node "<rank> <node id> <tick>" (the issue order of a
+    // run; e8-astrasim/tools/order_coll.py takes the program order of each group's collectives from it)
+    static FILE* issue_log = getenv("ASTRA_ISSUE_LOG") ? fopen(getenv("ASTRA_ISSUE_LOG"), "w") : nullptr;
+    if (issue_log) {
+        fprintf(issue_log, "%d %lu %lu\n", sys->id, (unsigned long)node->id(), (unsigned long)Sys::boostedTick());
+        fflush(issue_log);
+    }
     this->et_feeder->getDependancyResolver().take_node(node->id());
     this->hw_resource->occupy(node);
     // stats->record_end will be called in Workload::call

@@ -78,3 +78,23 @@ if (BUILDTARGET STREQUAL "all" OR BUILDTARGET STREQUAL "congestion_aware")
             ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../lib/
     )
 endif ()
+
+# Loom analytical model (LoomNet: per-put formulas for Loom and an RDMA NIC; e8-astrasim/ANALYTICAL.md)
+file(GLOB srcs_loom
+        ${CMAKE_CURRENT_SOURCE_DIR}/loom/*.cc
+)
+if (BUILDTARGET STREQUAL "all" OR BUILDTARGET STREQUAL "loom")
+    add_executable(AstraSim_Analytical_Loom ${srcs_loom} ${srcs_common})
+    target_link_libraries(AstraSim_Analytical_Loom LINK_PRIVATE AstraSim)
+    target_link_libraries(AstraSim_Analytical_Loom LINK_PRIVATE Analytical_Congestion_Unaware)
+    target_include_directories(AstraSim_Analytical_Loom PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/)
+    target_include_directories(AstraSim_Analytical_Loom PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../../extern/)
+    target_include_directories(AstraSim_Analytical_Loom PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../../extern/helper)
+    set_target_properties(AstraSim_Analytical_Loom PROPERTIES COMPILE_WARNING_AS_ERROR OFF)
+    set_target_properties(AstraSim_Analytical_Loom
+            PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../bin/
+            LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../lib/
+            ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../lib/
+    )
+endif ()

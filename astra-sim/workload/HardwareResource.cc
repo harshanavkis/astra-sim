@@ -18,6 +18,21 @@ static bool concurrent_sends() {
     return on;
 }
 
+// loom branch: ASTRA_COMM_PER_GROUP=1 keeps one communication op in flight per communicator group (NCCL: one stream
+// per communicator; frameworks run TP, DP and PP traffic on separate streams) instead of one per GPU (upstream). With
+// one per GPU, collectives of crossing groups (TP inside a server, DP across) that peers issue in different orders
+// wait for each other in a cycle (deadlock 2026-10-20, Phase A hybrid on ns-3 and DP on the analytical fabric model).
+// A GPU's point-to-point sends share one key ("send"); ASTRA_CONCURRENT_SENDS=1 frees them as before.
+static bool comm_per_group() {
+    static const bool on = getenv("ASTRA_COMM_PER_GROUP") && atoi(getenv("ASTRA_COMM_PER_GROUP"));
+    return on;
+}
+static std::string comm_key(const shared_ptr<Chakra::FeederV3::ETFeederNode>& node) {
+    if (node->type() == ChakraProtoMsg::NodeType::COMM_SEND_NODE)
+        return "send";
+    return "pg:" + node->pg_name<std::string>("");
+}
+
 typedef ChakraProtoMsg::NodeType ChakraNodeType;
 
 HardwareResource::HardwareResource(uint32_t num_npus, int sys_id)
@@ -59,6 +74,14 @@ void HardwareResource::occupy(
                 (concurrent_sends() && node->type() == ChakraNodeType::COMM_SEND_NODE)) {
                 return;
             }
+            if (comm_per_group()) {
+                auto& n = comm_in_flight[comm_key(node)];
+                assert(n == 0);
+                ++n;
+                ++num_gpu_comms;
+                gpu_comms_node.emplace(node->id());
+                return;
+            }
             assert(num_in_flight_gpu_comm_ops == 0);
             ++num_in_flight_gpu_comm_ops;
             ++num_gpu_comms;
@@ -84,6 +107,13 @@ void HardwareResource::release(
                 (concurrent_sends() && node->type() == ChakraNodeType::COMM_SEND_NODE)) {
                 return;
             }
+            if (comm_per_group()) {
+                auto& n = comm_in_flight[comm_key(node)];
+                --n;
+                assert(n == 0);
+                this->gpu_comms_node.erase(node->id());
+                return;
+            }
             --num_in_flight_gpu_comm_ops;
             assert(num_in_flight_gpu_comm_ops == 0);
             this->gpu_comms_node.erase(node->id());
@@ -107,6 +137,11 @@ bool HardwareResource::is_available(
                 return false;
             }
         } else {
+            if (comm_per_group() && node->type() != ChakraNodeType::COMM_RECV_NODE &&
+                !(concurrent_sends() && node->type() == ChakraNodeType::COMM_SEND_NODE)) {
+                auto it = comm_in_flight.find(comm_key(node));
+                return it == comm_in_flight.end() || it->second == 0;
+            }
             if (num_in_flight_gpu_comm_ops == 0) {
                 return true;
             } else {

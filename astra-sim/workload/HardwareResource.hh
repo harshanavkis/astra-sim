@@ -10,6 +10,8 @@ LICENSE file in the root directory of this source tree.
 
 #include "astra-sim/common/Logging.hh"
 #include <cstdint>
+#include <string>
+#include <unordered_map>
 
 #include "extern/graph_frontend/chakra/src/feeder_v3/et_feeder.h"
 
@@ -53,6 +55,8 @@ class HardwareResource {
     uint32_t num_in_flight_cpu_ops;
     uint32_t num_in_flight_gpu_comp_ops;
     uint32_t num_in_flight_gpu_comm_ops;
+    // loom branch, ASTRA_COMM_PER_GROUP=1: comm ops in flight per communicator group (key: pg_name; sends: "send")
+    std::unordered_map<std::string, uint32_t> comm_in_flight;
 
     uint64_t num_cpu_ops;
     uint64_t num_gpu_ops;
