@@ -1,0 +1,2 @@
+decfifo_ep256_t16_l4096_mb2__rdma /scratch/harshanavkis/loom-proj/e8-astrasim/traces/decode/ep256_t16_l4096_mb2/decode /scratch/harshanavkis/loom-proj/e8-astrasim/e8/cfg/system_decode_fifo.json /scratch/harshanavkis/loom-proj/e8-astrasim/e8_an/decode/cfg/rdma_ep256.txt x
+decfifo_ep256_t16_l4096_mb2__loom /scratch/harshanavkis/loom-proj/e8-astrasim/traces/decode/ep256_t16_l4096_mb2/decode /scratch/harshanavkis/loom-proj/e8-astrasim/e8/cfg/system_decode_fifo.json /scratch/harshanavkis/loom-proj/e8-astrasim/e8_an/decode/cfg/loom_ep256.txt x
