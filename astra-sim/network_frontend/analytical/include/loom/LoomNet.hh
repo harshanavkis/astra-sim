@@ -40,6 +40,8 @@ struct Config {
     double nic_tx_ns = 0, nic_rx_ns = 0, rx_poll_ns = 0, cqe_poll_ns = 0;
     int sq_mem = GPU, buf_mem = GPU, cq_mem = GPU, rx_mem = GPU, poster = GPU;
     double pcie_gbps = 57.6;                 // GB/s = B/ns, per direction, payload
+    double tx_buf = 0;                       // LOOM_TX_BUF_BYTES: Loom's transmit buffer per port (0 = unlimited); a
+                                             // store is accepted once at most this many bytes wait ahead of it; sensitivity only
     double rd_gpu_ns = 1350, rd_host_ns = 680, wr_gpu_ns = 700, wr_host_ns = 340, db_gpu_ns = 700, db_host_ns = 340;
     uint32_t mtu = 1000, wire_bytes = 0;     // PACKET_PAYLOAD_SIZE, WIRE_BYTES_PER_PACKET
     uint32_t atomic_wire = 20;               // ATOMIC_WIRE: an atomic request's extra bytes on the wire (AtomicETH 28 B)
@@ -80,6 +82,7 @@ struct Config {
             else if (k == "NIC_RX_MEM") { is >> s; rx_mem = ep(s); }
             else if (k == "NIC_POSTER") { is >> s; poster = ep(s); }
             else if (k == "PCIE_LINK_GBPS") is >> pcie_gbps;
+            else if (k == "LOOM_TX_BUF_BYTES") is >> tx_buf;
             else if (k == "PCIE_RD_GPU_NS") is >> rd_gpu_ns;
             else if (k == "PCIE_RD_HOST_NS") is >> rd_host_ns;
             else if (k == "PCIE_WR_GPU_NS") is >> wr_gpu_ns;
@@ -325,7 +328,7 @@ class Model {
         uint64_t idx = 0;            // its WQE index on the queue pair (the order of the QP's byte stream)
         uint64_t seq = 0;            // global posting order
         PutCallbacks cb;
-        double t_post = 0, t_wqe = -1, t_wire0 = -1, t_wire1 = -1;
+        double t_post = 0, t_wqe = -1, t_wire0 = -1, t_wire1 = -1, t_out = -1;
         double data_last = 0;        // all its bytes in the sending NIC / Loom
         uint64_t first_pkt(const Config& c) const { return std::min<uint64_t>(bytes, c.mtu); }
     };
@@ -367,6 +370,7 @@ class Model {
     std::vector<double> link_busy;   // every directed network link: busy until (ns)
     std::vector<double> link_bytes;  // wire bytes per link (report)
     std::map<QpKey, std::vector<Topology::Hop>> routes;
+    std::map<int, double> port_end;  // Loom with a finite transmit buffer: its port's link busy until (stores())
 
     PutP make_put(int src, int dst, int qp, uint64_t bytes, bool atomic, PutCallbacks cb, double t) {
         auto p = std::make_shared<Put>();
@@ -395,16 +399,30 @@ class Model {
         return p;
     }
 
-    // Loom, posted writes: the GPU's stores (WQE header + payload) cross its PCIe link; Loom has each piece as it lands
-    // and forwards per packet. Sender released when its last store has left the GPU.
+    // Loom, posted writes: the GPU's stores (payload only: Loom has no work request, WQE_BYTES does not apply) cross
+    // its PCIe link; Loom has each piece as it lands and forwards per packet. Sender released when its last store has
+    // left the GPU.
     void stores(const PutP& p, double t) {
         const Config& c = cfg;
         Pcie& ps = pcie(p->src);
         const double s0 = ps.start(c.poster, NIC, t);
-        const double s1 = ps.hold(c.poster, NIC, c.wqe_bytes + p->bytes, t);
+        const double s1 = ps.hold(c.poster, NIC, p->bytes, t);
         p->data_last = s1 + c.db_lat(c.poster);
-        emit(p->cb.out, s1);
-        at(s0 + (c.wqe_bytes + p->first_pkt(c)) / c.pcie_gbps + c.db_lat(c.poster) + c.nic_tx_ns,
+        p->t_out = s1;
+        if (c.tx_buf <= 0) emit(p->cb.out, s1);
+        else {
+            // finite transmit buffer: the last store is accepted once at most tx_buf bytes wait ahead of it on Loom's port
+            // (the Loom -> switch link carries only this GPU's puts, FIFO, so its end is known now, as send() computes it)
+            const double N = topo.link_gbps, L = c.db_lat(c.poster) + c.nic_tx_ns;
+            const uint64_t npkt = p->bytes ? (p->bytes + c.mtu - 1) / c.mtu : 1;
+            const double wire_b = p->bytes + (double)npkt * c.wire_bytes;
+            const double w_last = (p->bytes ? p->bytes - (npkt - 1) * c.mtu : 0) + c.wire_bytes;
+            double& port = port_end[p->src];
+            const double e0 = std::max(std::max(s0 + p->first_pkt(c) / c.pcie_gbps + L, port) + wire_b / N, s1 + L + w_last / N);
+            port = e0;
+            emit(p->cb.out, std::max(s1, e0 - c.tx_buf / N));
+        }
+        at(s0 + p->first_pkt(c) / c.pcie_gbps + c.db_lat(c.poster) + c.nic_tx_ns,
            [this, p](double tw) { wire(p, tw); });
     }
 
@@ -531,7 +549,9 @@ class Model {
         });
     }
     // the receiving NIC / Loom writes the data into memory (the last packet's write ends no earlier than its
-    // arrival + its bytes at the PCIe rate); RDMA: the last packet's ACK returns and the NIC writes a 64 B CQE
+    // arrival + its bytes at the PCIe rate; posted writes stay in order, so the link is busy until that last write
+    // ends and the next put, e.g. the signal behind the data, cannot land first); RDMA: the last packet's ACK returns
+    // and the NIC writes a 64 B CQE
     void rx(const PutP& p, double t, double a1, double last_pay, double prop, int nsw) {
         const Config& c = cfg;
         const double B = c.pcie_gbps, N = topo.link_gbps;
@@ -551,7 +571,10 @@ class Model {
             });
             return;
         }
-        const double i1 = std::max(pcie(p->dst).hold(NIC, c.rx_mem, p->bytes, t), a1 + c.nic_rx_ns + last_pay / B);
+        Pcie& pd = pcie(p->dst);
+        const double i1 = std::max(pd.hold(NIC, c.rx_mem, p->bytes, t), a1 + c.nic_rx_ns + last_pay / B);
+        pd.out[NIC] = std::max(pd.out[NIC], i1);
+        if (c.rx_mem != HOST) pd.in[c.rx_mem] = std::max(pd.in[c.rx_mem], i1);
         const double seen = i1 + c.wr_lat(c.rx_mem) + c.rx_poll_ns;
         emit(p->cb.seen, seen);
         if (trace_src == p->src)
