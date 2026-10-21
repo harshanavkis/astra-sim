@@ -776,39 +776,50 @@ SIZE_COLORS = ('tab:orange', 'tab:red', 'tab:purple', 'tab:brown')
 
 
 def figure_sweep(out_dir, png_dir):
-    """The at-scale model with faster links, PCIe scaled with them (Gen5 up to 400 Gbps, Gen6 at 800, Gen7 at 1600;
-    owner 2026-10-20: no Gen5 point at 800):
-    (a) one-way latency of one message, (b) all-to-all on 16 GPUs, 16 KiB per GPU. y = RDMA time / Loom time (higher =
-    Loom faster). The stream panel was dropped (owner 2026-10-20: (c) and Fig 12 already make its points); its rows stay
-    in sweep.tsv."""
+    """Sensitivity of the at-scale model (owner 2026-10-21: one parameter at a time, the new Fig 13; was the link-rate
+    sweep alone): (a) link rate, PCIe scaled with it (Gen5 up to 400 Gbps, Gen6 at 800, Gen7 at 1600), (b) the GPU's PCIe
+    latencies (doorbell/store, NIC read, write: 645 / 1350 / 645 ns measured) x 0.25 .. 2, (c) the network stack (RoCE
+    transport, MAC, PHY: the NIC's 260 / 590 ns, which Loom reuses; Loom keeps its 21 / 7 cycles on top) x 0.25 .. 2;
+    (b) and (c) at 400 Gbps. Lines: one message between two GPUs (64 B .. 64 KiB) and an all-to-all of 16 KiB per GPU on
+    16 GPUs. y = RDMA time / Loom time (higher = Loom faster); dotted = the nominal point. Data: run_sweep_an.py sweep.tsv
+    (the stream rows and the Gen5-at-800 point stay there, not shown)."""
     rows = [l.split('\t') for l in open(os.path.join(X, SWEEP)).read().splitlines()[1:]]
     v = {(r[0], r[1], r[2], int(r[3])): float(r[4]) for r in rows}
-    fs = SINGLE_COLUMN_FONT_SIZES
-    fig, axes = plt.subplots(1, 2, figsize=(7.5, 4.2), sharey=True)
-    fig.subplots_adjust(left=0.12, right=0.99, top=0.86, bottom=0.17, wspace=0.08)
-    LN = dict(LINE, markersize=8, linewidth=1.8)
-    xs = [g for _, g in SWEEP_RATES]
-    panels = ((axes[0], 'lat', (64, 4096, 16384, 65536), lambda e, s, t: v[(e, 'rdma', t, s)] / v[(e, 'loom', t, s)], '(a) Latency'),
-              (axes[1], 'a2a', (16384,), lambda e, s, t: v[(e, 'rdma', t, s)] / v[(e, 'loom', t, s)], '(b) All-to-all, 16 GPUs'))
-    for ax, e, sizes, ratio, ttl in panels:
-        for s_, c, mk in zip(sizes, SIZE_COLORS if len(sizes) > 1 else ('k',), 'osD^'):
-            y = [ratio(e, s_, t) for t, _ in SWEEP_RATES]
-            ax.plot(xs, y, color=c, marker=mk, label=size_label(s_), **LN)
-            print(f'sweep {e} {size_label(s_)}: ' + ' '.join(f'{g}G {r:.2f}' for g, r in zip(xs, y)) + f' | 800G Gen5 {ratio(e, s_, "800gen5"):.2f}')
+    fs = COMBINED_FONT_SIZES
+    fig, axes = plt.subplots(1, 3, figsize=(E2E_COMBINED_FIGURE_SIZE[0] * 0.75, 9.5), sharey=True)
+    fig.subplots_adjust(left=0.06, right=0.99, top=0.88, bottom=0.31, wspace=0.08)
+    LN = dict(LINE, markersize=22, linewidth=4)
+    scales = (0.25, 0.5, 1, 1.5, 2)
+    cols = ((axes[0], [(t, g) for t, g in SWEEP_RATES], 400, 'Link rate [Gbps]', '(a) Link rate', lambda g: str(g)),
+            (axes[1], [('400' if k == 1 else f'pcie{k:g}', k) for k in scales], 1, 'PCIe latency [x measured]',
+             '(b) PCIe latency', lambda k: f'{k:g}'),
+            (axes[2], [('400' if k == 1 else f'stack{k:g}', k) for k in scales], 1, 'Network-stack latency [x measured]',
+             '(c) Network-stack latency', lambda k: f'{k:g}'))
+    series = [('lat', s_, c, mk, size_label(s_)) for s_, c, mk in zip((64, 4096, 16384, 65536), SIZE_COLORS, 'osD^')]
+    series.append(('a2a', 16384, 'k', 'v', 'All-to-all, 16 GPUs, 16 KiB per GPU'))
+    for ax, pts, nominal, xl, ttl, fmt in cols:
+        xs = [x for _, x in pts]
+        for e, s_, c, mk, lab in series:
+            y = [v[(e, 'rdma', t, s_)] / v[(e, 'loom', t, s_)] for t, _ in pts]
+            ax.plot(xs, y, color=c, marker=mk, label=lab, linestyle='--' if e == 'a2a' else '-', **LN)
+            print(f'sens {ttl} {e} {lab}: ' + ' '.join(f'{fmt(x)} {r:.2f}' for x, r in zip(xs, y)))
+        ax.axvline(nominal, color='grey', linestyle=':', linewidth=3)
         ax.set_xscale('log', base=2)
-        ax.set_xticks(xs); ax.set_xticklabels([str(g) for g in xs], fontsize=fs['tick'] - 4)
+        ax.set_xticks(xs); ax.set_xticklabels([fmt(x) for x in xs], fontsize=fs['tick'] - 6)
         ax.xaxis.set_minor_locator(mticker.NullLocator())
-        ax.set_xlabel('Link rate [Gbps]', fontsize=fs['label'] - 2)
-        ax.tick_params(axis='y', labelsize=fs['tick'])
+        ax.set_xlabel(xl, fontsize=fs['label'] - 4)
+        ax.tick_params(axis='y', labelsize=fs['tick'] - 4)
         ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda q, _: f'{q:g}x'))
         ax.grid(True, alpha=0.3)
-        ax.axhline(1.0, color='k', linewidth=1)
-        title(ax, ttl, fs['annotation'] - 4)
-        if len(sizes) > 1:
-            ax.legend(loc='lower right' if e == 'lat' else 'upper left', fontsize=fs['legend'] - 5, frameon=True, labelspacing=0.2, handlelength=1.5,
-                      borderaxespad=0.3)
-    axes[0].set_ylim(0.8, 4.6)
-    axes[0].set_ylabel('RDMA / Loom', fontsize=fs['label'])
+        ax.axhline(1.0, color='k', linewidth=2)
+        title(ax, ttl, fs['annotation'] - 6)
+    axes[0].set_ylim(0.8, 3.6)
+    axes[0].set_ylabel('RDMA / Loom', fontsize=fs['label'] - 2)
+    h, lab = axes[0].get_legend_handles_labels()
+    fig.legend(h + [Line2D([0], [0], color='grey', linestyle=':', linewidth=3)],
+               [f'one message, {l}' if i < 4 else l for i, l in enumerate(lab)] + ['nominal'],
+               loc='upper center', bbox_to_anchor=(0.5, 0.075), ncol=6, frameon=False, fontsize=fs['legend'] - 10,
+               borderaxespad=0, handlelength=2.5)
     save(fig, out_dir, png_dir, 'eval-sweep')
 
 
@@ -822,7 +833,9 @@ def figure_e2e(out_dir, png_dir):
              ('moe_mixed', 'EP+TP+DP', 'MoE'), ('moe_scaleout', 'EP+DP', 'MoE'))   # single column (owner 2026-10-20):
     # full labels rotated by 90 degrees
     t = {}
-    for l in open(os.path.join(E, D8, 'e2e/e2e_phaseA.tsv')).read().splitlines()[1:]:
+    # owner 2026-10-21: full depth (the training sweep's runs, AN=1 FULL=1 tools/collect_e2e.py -> e2e_full.tsv); the
+    # ns-3 model keeps its Phase A (cut-depth) data
+    for l in open(os.path.join(E, D8, 'e2e/e2e_full.tsv' if AN else 'e2e/e2e_phaseA.tsv')).read().splitlines()[1:]:
         k, lab, v, it, ex, n, log = l.split('\t')
         t[(k, v)] = (float(it), float(ex), int(n))
     groups = [g for g in ORDER if (g[0], 'rdma') in t and (g[0], 'loom') in t]

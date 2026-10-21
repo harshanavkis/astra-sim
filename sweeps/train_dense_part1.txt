@@ -1,0 +1,38 @@
+dp|l8|full|dp=8 tp=8 pp=1|256|256|4096||n64nm
+fsdp|l8|full|dp=8 tp=8 pp=1|256|256|4096|--weight_sharded true|n64nm
+pp|l70|full|dp=1 tp=8 pp=8|64|8|4096||n64nm
+cp|l8|full|dp=1 tp=8 sp=8 pp=1|8|8|32768||n64nm
+hybrid|l70|full|dp=2 tp=8 pp=4|64|8|4096||n64nm
+l80|l80|full|dp=4 tp=8 pp=4|256|256|4096||n128nm
+pp_mb4|l70|full|dp=1 tp=8 pp=8|64|4|4096||n64nm
+pp_mb16|l70|full|dp=1 tp=8 pp=8|64|16|4096||n64nm
+hybrid_mb4|l70|full|dp=2 tp=8 pp=4|64|4|4096||n64nm
+hybrid_mb16|l70|full|dp=2 tp=8 pp=4|64|16|4096||n64nm
+tp8_mb8|l70|full|dp=8 tp=8 pp=1|64|8|4096||n64nm
+tp16_mb8|l70|full|dp=4 tp=16 pp=1|64|8|4096||n64nm
+tp32_mb8|l70|full|dp=2 tp=32 pp=1|64|8|4096||n64nm
+tp64_mb8|l70|full|dp=1 tp=64 pp=1|64|8|4096||n64nm
+cp_s8k|l8|full|dp=1 tp=8 sp=8 pp=1|8|8|8192||n64nm
+cp_s16k|l8|full|dp=1 tp=8 sp=8 pp=1|8|8|16384||n64nm
+cp_s64k|l8|full|dp=1 tp=8 sp=8 pp=1|8|8|65536||n64nm
+cp_s128k|l8|full|dp=1 tp=8 sp=8 pp=1|8|8|131072||n64nm
+dp_w128|l8|full|dp=16 tp=8 pp=1|512|512|4096||n128nm
+dp_w256|l8|full|dp=32 tp=8 pp=1|1024|1024|4096||n256
+dp_s128|l8|full|dp=16 tp=8 pp=1|256|256|4096||n128nm
+dp_s256|l8|full|dp=32 tp=8 pp=1|256|256|4096||n256
+dp|l8|full|dp=8 tp=8 pp=1|256|256|4096||n64_l100
+dp|l8|full|dp=8 tp=8 pp=1|256|256|4096||n64_l200
+dp|l8|full|dp=8 tp=8 pp=1|256|256|4096||n64_l800
+dp|l8|full|dp=8 tp=8 pp=1|256|256|4096||n64_l1600
+pp|l70|full|dp=1 tp=8 pp=8|64|8|4096||n64_l100
+pp|l70|full|dp=1 tp=8 pp=8|64|8|4096||n64_l200
+pp|l70|full|dp=1 tp=8 pp=8|64|8|4096||n64_l800
+pp|l70|full|dp=1 tp=8 pp=8|64|8|4096||n64_l1600
+cp|l8|full|dp=1 tp=8 sp=8 pp=1|8|8|32768||n64_l100
+cp|l8|full|dp=1 tp=8 sp=8 pp=1|8|8|32768||n64_l200
+cp|l8|full|dp=1 tp=8 sp=8 pp=1|8|8|32768||n64_l800
+cp|l8|full|dp=1 tp=8 sp=8 pp=1|8|8|32768||n64_l1600
+hybrid|l70|full|dp=2 tp=8 pp=4|64|8|4096||n64_l100
+hybrid|l70|full|dp=2 tp=8 pp=4|64|8|4096||n64_l200
+hybrid|l70|full|dp=2 tp=8 pp=4|64|8|4096||n64_l800
+hybrid|l70|full|dp=2 tp=8 pp=4|64|8|4096||n64_l1600

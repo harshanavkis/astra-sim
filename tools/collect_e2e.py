@@ -2,7 +2,7 @@
 """Fig 14 (At Scale "Training", Phase A 2026-10-20) data: per bar group the RDMA and Loom iteration (slowest GPU) and that
 GPU's exposed communication, from the newest run log of each (run_e2e_phaseA.sh; Opus MoE rows = pilotfix runs). Refuses a
 log whose first line is not "ns3 build OK" (stale-binary guard). Model results.
-  python3 -I collect_e2e.py [out.tsv]     (default e8/e2e/e2e_phaseA.tsv)
+  python3 -I collect_e2e.py [out.tsv]     (default e8/e2e/e2e_phaseA.tsv; AN=1 FULL=1: e8_an/e2e/e2e_full.tsv)
 """
 import glob, os, re, sys
 
@@ -18,6 +18,14 @@ GROUPS = (  # key, run name, cluster, label (n64nm = n64 with the queue monitor 
 
 
 AN = os.environ.get("AN") == "1"   # AN=1: the LoomNet analytical model (runs_an/an_*, ANALYTICAL.md)
+# FULL=1 (with AN=1; owner 2026-10-21: Fig 14 = the parallelism groups at full depth): the training sweep's runs
+# (tools/sweep_train.sh / sweep_moe_train.sh, sweeps/train_dense.txt + train_moe.txt) -> e8_an/e2e/e2e_full.tsv
+FULL = os.environ.get("FULL") == "1"
+if FULL:
+    GROUPS = (("dp", "sw_dp", "n64nm", "DP"), ("fsdp", "sw_fsdp", "n64nm", "FSDP"), ("pp", "sw_pp", "n64nm", "PP"),
+              ("cp", "sw_cp", "n64nm", "CP"), ("hybrid", "sw_hybrid", "n64nm", "TP+PP+DP"),
+              ("l80", "sw_l80", "n128nm", "Llama-80B"), ("moe_mixed", "sw_moe_mixed_ep64", "n64nm", "MoE EP+TP+DP"),
+              ("moe_scaleout", "sw_moe_scaleout_ep8", "n64nm", "MoE EP+DP"))
 
 
 def run(name, cl, v):
@@ -51,7 +59,7 @@ def run(name, cl, v):
     return it / 1e6, exp / 1e6, len(fin), os.path.basename(logs[-1])
 
 
-out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(E, "e8_an/e2e/e2e_phaseA.tsv" if AN else "e8/e2e/e2e_phaseA.tsv")
+out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(E, ("e8_an/e2e/e2e_full.tsv" if FULL else "e8_an/e2e/e2e_phaseA.tsv") if AN else "e8/e2e/e2e_phaseA.tsv")
 os.makedirs(os.path.dirname(out), exist_ok=True)
 with open(out, "w") as f:
     f.write("key\tlabel\tvariant\titer_ms\texposed_ms\tgpus\tlog\n")

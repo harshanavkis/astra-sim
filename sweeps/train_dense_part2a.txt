@@ -1,0 +1,22 @@
+pp_mb1|l70|full|dp=1 tp=8 pp=8|64|1|4096||n64nm
+pp_mb2|l70|full|dp=1 tp=8 pp=8|64|2|4096||n64nm
+hybrid_mb1|l70|full|dp=2 tp=8 pp=4|64|1|4096||n64nm
+hybrid_mb2|l70|full|dp=2 tp=8 pp=4|64|2|4096||n64nm
+tp8_mb1|l70|full|dp=8 tp=8 pp=1|64|1|4096||n64nm
+tp16_mb1|l70|full|dp=4 tp=16 pp=1|64|1|4096||n64nm
+tp32_mb1|l70|full|dp=2 tp=32 pp=1|64|1|4096||n64nm
+tp64_mb1|l70|full|dp=1 tp=64 pp=1|64|1|4096||n64nm
+tp16_seq1k|l70|full|dp=4 tp=16 pp=1|64|1|1024||n64nm
+tp32_seq1k|l70|full|dp=2 tp=32 pp=1|64|1|1024||n64nm
+cp_s32k_mb1|l8|full|dp=1 tp=8 sp=8 pp=1|8|1|32768||n64nm
+dp_w512|l8|full|dp=64 tp=8 pp=1|2048|2048|4096||n512
+dp_s512|l8|full|dp=64 tp=8 pp=1|256|256|4096||n512
+hybrid_256|l70|full|dp=8 tp=8 pp=4|256|8|4096||n256
+dp_b64|l8|full|dp=8 tp=8 pp=1|64|64|4096||n64nm
+dp_b128|l8|full|dp=8 tp=8 pp=1|128|128|4096||n64nm
+dp_b512|l8|full|dp=8 tp=8 pp=1|512|512|4096||n64nm
+fsdp_mb32|l8|full|dp=8 tp=8 pp=1|256|32|4096|--weight_sharded true|n64nm
+tp32_mb1|l70|full|dp=2 tp=32 pp=1|64|1|4096||n64_l100
+tp32_mb1|l70|full|dp=2 tp=32 pp=1|64|1|4096||n64_l200
+tp32_mb1|l70|full|dp=2 tp=32 pp=1|64|1|4096||n64_l800
+tp32_mb1|l70|full|dp=2 tp=32 pp=1|64|1|4096||n64_l1600

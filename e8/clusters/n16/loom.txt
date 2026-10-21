@@ -87,5 +87,7 @@ CQE_POLL_NS 0
 NIC_PUSH 1
 NIC_BF 1
 INLINE_MAX 1000000000
-NIC_TX_NS 21
-NIC_RX_NS 7
+# Loom = its own pipelines (21 / 7 cycles at ASTRA-sim's 1 ns, RTL) + the network stack it reuses (RoCE transport,
+# MAC, PHY) at the NIC's measured pipelines (260 / 590 ns, ConnectX-7 on steve): owner 2026-10-21
+NIC_TX_NS 281
+NIC_RX_NS 597

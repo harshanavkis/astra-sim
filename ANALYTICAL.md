@@ -39,18 +39,26 @@ Notation: `S` payload bytes; `B` PCIe payload rate per direction (Gen5 x16: 57.6
 (computed: preamble/IFG 20, Eth+FCS 18, IP 20, UDP 8, BTH 12, ICRC 4); `wire(S) = S + ceil(S/MTU)*W`.
 PCIe latencies (measured on steve, H200 + CX-7, `e8/cfg/steve_nic/base.txt`): store/doorbell GPU->NIC `L_db` 645 ns,
 NIC read of GPU memory `L_rd` 1350 ns, NIC write visible to the GPU `L_wr` 645 ns; NIC pipelines `T_tx` 260 / `T_rx`
-590 ns (measured); Loom pipelines 21 / 7 cycles (RTL) at 1 GHz.
+590 ns (measured); Loom = its pipelines, 21 / 7 cycles (RTL) at ASTRA-sim's 1 ns clock, PLUS the network stack it reuses
+(RoCE transport, MAC, PHY) at the NIC's 260 / 590 ns (owner 2026-10-21; before, Loom paid only 21 / 7 ns: ~850 ns too fast
+per message at scale). The prototype validation keeps 21 / 7 cycles at 250 MHz: there both systems share Coyote's stack
+inside the one fitted link delay.
 
 Each stage is a formula evaluated at the stage's own time, in time order (so a resource is never booked "into the
 past"); `max(...)` with a resource's busy-until time is the only coupling between puts.
 
 **Loom (posted writes)**
-1. Stores: the GPU's stores (WQE header + payload) cross its PCIe link, puts in posting order: `s0 = max(t, busy_pcie)`,
-   `s1 = s0 + (WQE + S)/B`. **Sender released at `s1`** (its last store has left the GPU).
-2. Loom has each piece as it lands and forwards per packet: first packet ready `s0 + (WQE + min(S,MTU))/B + L_db + T_tx`,
+1. Stores: the GPU's stores (payload only; Loom has no work request, so no WQE bytes since 2026-10-21) cross its PCIe
+   link, puts in posting order: `s0 = max(t, busy_pcie)`, `s1 = s0 + S/B`. **Sender released at `s1`** (its last store
+   has left the GPU).
+2. Loom has each piece as it lands and forwards per packet: first packet ready `s0 + min(S,MTU)/B + L_db + T_tx`,
    all bytes in at `s1 + L_db`.
 3. Wire and network (Section 3), then Loom's receive pipeline `T_rx` and the writes into GPU memory at `B`;
-   **delivered** = last write + `L_wr`.
+   **delivered** = last write + `L_wr`. The receiving PCIe link stays busy until that last write ends (posted writes in
+   order: the signal behind the data cannot land first; fix 2026-10-21, Loom +37..+69 ns, RDMA +70 ns from 1 MiB).
+Sensitivity option (default off, not used by the paper's runs): `LOOM_TX_BUF_BYTES` = Loom's transmit buffer per port: the last
+store of a put is accepted at `max(s1, e0 - buf/N)` (e0 = its last byte on the Loom -> switch link, which carries only this
+GPU's puts, FIFO, so it is computed at store time). Without it Loom absorbs any amount of stores (upper bound).
 
 **RDMA (the same transfer + its added delays)**
 1. Doorbell: an 8 B MMIO store, lands `L_db` later (BlueFlame configs: the WQE goes with it).
@@ -89,16 +97,18 @@ GPU 8 on the same leaf / GPU 0 -> 32 across leaves; fit over 64 KiB..64 MiB):
 
 | 400 G cluster | alpha delivered | alpha sender released | beta |
 |---|---|---|---|
-| RDMA | 5.31 / 6.09 us | 5.62 / 7.01 us | 49.0 GB/s (= 50 GB/s x 4096/4178) |
-| Loom | 1.79 / 2.56 us | 0.002 us | 49.0 GB/s delivered, 57.6 GB/s released (PCIe) |
+| RDMA | 5.63 / 6.33 us | 5.95 / 7.26 us | 49.0 GB/s (= 50 GB/s x 4096/4178) |
+| Loom | 2.70 / 3.48 us | 0.000 us | 49.0 GB/s delivered, 57.6 GB/s released (PCIe) |
+
+(2026-10-21 12:33, binary 73656926: with the receiver write-order fix, no Loom WQE bytes and Loom's network stack.)
 
 **Worked example** (computed by hand from the formulas; the simulator prints the same): an 8 B message GPU 0 -> GPU 8
-(two 155 ns links, one switch, 400 G). Loom: stores land 645 + (64+8)/57.6 = 646 ns; + Loom tx 21; + 2 x 155 = 310;
-+ one 90 B packet on two links 2 x 1.8; + Loom rx 7; + write 8/57.6 + 645 visible = **1633 ns** (simulator 1635).
+(two 155 ns links, one switch, 400 G). Loom: stores land 645 + 8/57.6 = 645 ns; + Loom tx 260 + 21; + 2 x 155 = 310;
++ one 90 B packet on two links 2 x 1.8; + Loom rx 590 + 7; + write 8/57.6 + 645 visible = **2482 ns** (simulator 2484).
 RDMA: doorbell lands 645; WQE fetch + 1350 + 64/57.6 = 1996; payload read + 1350 = 3346; NIC tx + 260; wire + path
 ~ +314; NIC rx + 590; write + 645 = 5155 ns data visible; the signal's doorbell landed 0.14 ns after the first fetch
 started, so its WQE comes with the second fetch (1996 + 1350 = 3346), its read at 4696, visible at **6505 ns**
-(simulator 6506). Sender released: RDMA at the signal's CQE 6820 ns; Loom when its stores are out, 3 ns.
+(simulator 6506). Sender released: RDMA at the signal's CQE 6820 ns; Loom when its stores are out, 0 ns.
 
 Small RDMA messages (<= 16 KiB) are delivered after 6.5 us: the signal's WQE misses the first fetch and waits one more
 read round trip (as in the ns-3 NIC model).
@@ -231,6 +241,20 @@ header.
    regenerating into the paper (owner OK 2026-10-21). "bandwidth-bound within 0.86-1.17x" ->
    recompute; training within 0.5% (paper 0.7%).
 5. PP: Loom vs RDMA -0.02% here vs +0.70% on ns-3 (the ns-3 value came from its NVLink-port queue era / ordering).
+6. FORMULA REVIEW 2026-10-21 (owner asked; a + b APPLIED 2026-10-21 10:57 on owner OK, c in the paper's simulator
+   paragraph (alpha-beta form); d dropped: one PCIe payload rate for every size and both systems, so it cannot change
+   the comparison - a store-rate option I added was removed again on owner's order):
+   a. BUG, receiver write order: `rx()` books the receiving PCIe link for `bytes/B` from the first packet, but the last
+      packet's write ends at `a1 + T_rx + last/B`; the next put's write (the 8 B signal right behind the data) may then
+      land before the data's last packet. Fix (scratch: scratchpad rxorder/inc/LoomNet.hh): set the link busy until
+      `i1`. Effect (model, alpha_beta n64nm 0->8): Loom delivered +37 ns at 16 KiB, +69 ns from 64 KiB; RDMA +70 ns
+      from 1 MiB; alpha Loom 1.786 -> 1.855 us, RDMA 5.630 -> 5.668 us. Needs owner OK + rerun of all figures.
+   b. Loom pays `WQE_BYTES 64` per put on PCIe (loom.txt); Loom has no work request: +1.1 ns per put, conservative.
+   c. Paper text: T_RDMA / T_Loom are per PUT; a message adds its signal, and a small RDMA message's signal WQE waits
+      for a second fetch (+L_rd: 6.5 vs 5.15 us); RDMA completion is L_path after the data is visible (6821 - 6506 =
+      315 ns), not "L_path + L_wr".
+   d. Assumption: B = 57.6 GB/s assumes 256 B TLPs for the GPU's stores and for the NIC's read completions (not measured).
+   Fig 14 rerun on 7b733e65 (10:53): all 18 jobs identical to e8_an/e2e/e2e_phaseA.tsv.
 
 **Proposed paper text (NOT applied; evaluation.tex "Simulator and its validation", lines 73-75, and At Scale
 methodology line 304).** Replace the ns-3 sentence pair with:
