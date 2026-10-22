@@ -1,8 +1,8 @@
-# LoomNet analytical model: all results, 2026-10-21 12:33 UTC (model unless marked measured)
-binary 73656926 model 96710f6e
+# LoomNet analytical model: all results, 2026-10-21 23:54 UTC (model unless marked measured)
+binary fc8f6076 model f74bf3ed
 
 ## Validation against the prototype (measured vs model)
-# ANALYTICAL model (an_replay) vs prototype, 2026-10-21 12:33; configs /home/harshanavkis/loom-experiments/val_model/runs_an/20261021_1233/{loom,rdma}.txt
+# ANALYTICAL model (an_replay) vs prototype, 2026-10-21 23:55; configs /home/harshanavkis/loom-experiments/val_model/runs_an/20261021_2355/{loom,rdma}.txt
 # fitted: link delay 1689 ns per link (2 links), so that loom 8 B one-way = 4.07 us measured (model with 0 delay 0.69 us -> 4.07 us); PCIe 15.04 GB/s (computed, Gen3 x16 MPS 512)
 
 E2 one-way, us (measured median of 4,000; model)
@@ -54,7 +54,7 @@ a2a  16777216  Loom   785.49 model   689.45 (-12.2%)   RDMA   777.90 model   693
 
 ## Link-rate sweep
 
-100 Gbps, PCIe 57.6 GB/s (model)
+100: 100 Gbps, PCIe 57.6 GB/s, nominal (Loom nominal) (model)
   latency      0 B: RDMA     5.17 Loom     2.49 us  RDMA/Loom 2.07
   latency     64 B: RDMA     6.52 Loom     2.51 us  RDMA/Loom 2.60
   latency    256 B: RDMA     6.52 Loom     2.54 us  RDMA/Loom 2.56
@@ -67,7 +67,7 @@ a2a  16777216  Loom   785.49 model   689.45 (-12.2%)   RDMA   777.90 model   693
   stream  1048576 B: RDMA   12.23 Loom   12.24 GB/s  Loom/RDMA 1.00
   all-to-all 16 GPUs 16 KiB: RDMA 13.77 Loom 6.12 us  RDMA/Loom 2.25
 
-200 Gbps, PCIe 57.6 GB/s (model)
+200: 200 Gbps, PCIe 57.6 GB/s, nominal (Loom nominal) (model)
   latency      0 B: RDMA     5.16 Loom     2.48 us  RDMA/Loom 2.08
   latency     64 B: RDMA     6.51 Loom     2.50 us  RDMA/Loom 2.61
   latency    256 B: RDMA     6.51 Loom     2.51 us  RDMA/Loom 2.59
@@ -80,7 +80,7 @@ a2a  16777216  Loom   785.49 model   689.45 (-12.2%)   RDMA   777.90 model   693
   stream  1048576 B: RDMA   24.41 Loom   24.46 GB/s  Loom/RDMA 1.00
   all-to-all 16 GPUs 16 KiB: RDMA 13.42 Loom 5.57 us  RDMA/Loom 2.41
 
-400 Gbps, PCIe 57.6 GB/s (model)
+400: 400 Gbps, PCIe 57.6 GB/s, nominal (Loom nominal) (model)
   latency      0 B: RDMA     5.16 Loom     2.48 us  RDMA/Loom 2.08
   latency     64 B: RDMA     6.51 Loom     2.49 us  RDMA/Loom 2.62
   latency    256 B: RDMA     6.51 Loom     2.50 us  RDMA/Loom 2.60
@@ -93,7 +93,7 @@ a2a  16777216  Loom   785.49 model   689.45 (-12.2%)   RDMA   777.90 model   693
   stream  1048576 B: RDMA   48.64 Loom   48.83 GB/s  Loom/RDMA 1.00
   all-to-all 16 GPUs 16 KiB: RDMA 13.25 Loom 5.29 us  RDMA/Loom 2.50
 
-800 Gbps, PCIe 115.2 GB/s (model)
+800: 800 Gbps, PCIe 115.2 GB/s, nominal (Loom nominal) (model)
   latency      0 B: RDMA     5.15 Loom     2.48 us  RDMA/Loom 2.08
   latency     64 B: RDMA     6.50 Loom     2.48 us  RDMA/Loom 2.62
   latency    256 B: RDMA     6.50 Loom     2.49 us  RDMA/Loom 2.61
@@ -106,7 +106,7 @@ a2a  16777216  Loom   785.49 model   689.45 (-12.2%)   RDMA   777.90 model   693
   stream  1048576 B: RDMA   96.57 Loom   97.32 GB/s  Loom/RDMA 1.01
   all-to-all 16 GPUs 16 KiB: RDMA 13.14 Loom 5.14 us  RDMA/Loom 2.56
 
-1600 Gbps, PCIe 230.4 GB/s (model)
+1600: 1600 Gbps, PCIe 230.4 GB/s, nominal (Loom nominal) (model)
   latency      0 B: RDMA     5.15 Loom     2.48 us  RDMA/Loom 2.08
   latency     64 B: RDMA     6.50 Loom     2.48 us  RDMA/Loom 2.62
   latency    256 B: RDMA     6.50 Loom     2.48 us  RDMA/Loom 2.62
@@ -119,7 +119,7 @@ a2a  16777216  Loom   785.49 model   689.45 (-12.2%)   RDMA   777.90 model   693
   stream  1048576 B: RDMA  190.01 Loom  193.24 GB/s  Loom/RDMA 1.02
   all-to-all 16 GPUs 16 KiB: RDMA 13.09 Loom 5.07 us  RDMA/Loom 2.58
 
-800gen5 Gbps, PCIe 57.6 GB/s (model)
+800gen5: 800 Gbps, PCIe 57.6 GB/s, nominal (Loom nominal) (model)
   latency      0 B: RDMA     5.15 Loom     2.48 us  RDMA/Loom 2.08
   latency     64 B: RDMA     6.51 Loom     2.48 us  RDMA/Loom 2.62
   latency    256 B: RDMA     6.51 Loom     2.49 us  RDMA/Loom 2.61
@@ -131,6 +131,110 @@ a2a  16777216  Loom   785.49 model   689.45 (-12.2%)   RDMA   777.90 model   693
   stream    65536 B: RDMA   56.97 Loom   57.35 GB/s  Loom/RDMA 1.01
   stream  1048576 B: RDMA   57.02 Loom   57.35 GB/s  Loom/RDMA 1.01
   all-to-all 16 GPUs 16 KiB: RDMA 13.19 Loom 5.16 us  RDMA/Loom 2.56
+
+pcie0.25: 400 Gbps, PCIe 57.6 GB/s, {'PCIE_RD_GPU_NS': 337.5, 'PCIE_DB_GPU_NS': 161.25, 'PCIE_WR_GPU_NS': 161.25} (Loom {'PCIE_RD_GPU_NS': 337.5, 'PCIE_DB_GPU_NS': 161.25, 'PCIE_WR_GPU_NS': 161.25}) (model)
+  latency      0 B: RDMA     2.16 Loom     1.51 us  RDMA/Loom 1.43
+  latency     64 B: RDMA     2.50 Loom     1.52 us  RDMA/Loom 1.65
+  latency    256 B: RDMA     2.51 Loom     1.53 us  RDMA/Loom 1.63
+  latency   1024 B: RDMA     2.52 Loom     1.59 us  RDMA/Loom 1.58
+  latency   4096 B: RDMA     2.57 Loom     1.82 us  RDMA/Loom 1.41
+  latency  16384 B: RDMA     2.79 Loom     2.07 us  RDMA/Loom 1.35
+  latency  65536 B: RDMA     3.72 Loom     3.07 us  RDMA/Loom 1.21
+  stream     4096 B: RDMA   46.34 Loom   47.22 GB/s  Loom/RDMA 1.02
+  stream    65536 B: RDMA   48.85 Loom   48.90 GB/s  Loom/RDMA 1.00
+  stream  1048576 B: RDMA   48.86 Loom   48.90 GB/s  Loom/RDMA 1.00
+  all-to-all 16 GPUs 16 KiB: RDMA 5.24 Loom 3.35 us  RDMA/Loom 1.56
+
+pcie0.5: 400 Gbps, PCIe 57.6 GB/s, {'PCIE_RD_GPU_NS': 675.0, 'PCIE_DB_GPU_NS': 322.5, 'PCIE_WR_GPU_NS': 322.5} (Loom {'PCIE_RD_GPU_NS': 675.0, 'PCIE_DB_GPU_NS': 322.5, 'PCIE_WR_GPU_NS': 322.5}) (model)
+  latency      0 B: RDMA     3.16 Loom     1.84 us  RDMA/Loom 1.72
+  latency     64 B: RDMA     3.84 Loom     1.84 us  RDMA/Loom 2.08
+  latency    256 B: RDMA     3.84 Loom     1.86 us  RDMA/Loom 2.07
+  latency   1024 B: RDMA     3.85 Loom     1.91 us  RDMA/Loom 2.01
+  latency   4096 B: RDMA     3.91 Loom     2.14 us  RDMA/Loom 1.82
+  latency  16384 B: RDMA     4.12 Loom     2.39 us  RDMA/Loom 1.72
+  latency  65536 B: RDMA     4.97 Loom     3.40 us  RDMA/Loom 1.46
+  stream     4096 B: RDMA   45.18 Loom   46.88 GB/s  Loom/RDMA 1.04
+  stream    65536 B: RDMA   48.77 Loom   48.88 GB/s  Loom/RDMA 1.00
+  stream  1048576 B: RDMA   48.79 Loom   48.88 GB/s  Loom/RDMA 1.00
+  all-to-all 16 GPUs 16 KiB: RDMA 7.91 Loom 4.00 us  RDMA/Loom 1.98
+
+pcie1.5: 400 Gbps, PCIe 57.6 GB/s, {'PCIE_RD_GPU_NS': 2025.0, 'PCIE_DB_GPU_NS': 967.5, 'PCIE_WR_GPU_NS': 967.5} (Loom {'PCIE_RD_GPU_NS': 2025.0, 'PCIE_DB_GPU_NS': 967.5, 'PCIE_WR_GPU_NS': 967.5}) (model)
+  latency      0 B: RDMA     7.15 Loom     3.13 us  RDMA/Loom 2.29
+  latency     64 B: RDMA     9.18 Loom     3.13 us  RDMA/Loom 2.93
+  latency    256 B: RDMA     9.18 Loom     3.15 us  RDMA/Loom 2.92
+  latency   1024 B: RDMA     9.19 Loom     3.20 us  RDMA/Loom 2.87
+  latency   4096 B: RDMA     9.25 Loom     3.43 us  RDMA/Loom 2.69
+  latency  16384 B: RDMA     9.46 Loom     3.68 us  RDMA/Loom 2.57
+  latency  65536 B: RDMA    10.31 Loom     4.69 us  RDMA/Loom 2.20
+  stream     4096 B: RDMA   34.48 Loom   45.57 GB/s  Loom/RDMA 1.32
+  stream    65536 B: RDMA   48.44 Loom   48.79 GB/s  Loom/RDMA 1.01
+  stream  1048576 B: RDMA   48.50 Loom   48.79 GB/s  Loom/RDMA 1.01
+  all-to-all 16 GPUs 16 KiB: RDMA 18.59 Loom 6.58 us  RDMA/Loom 2.83
+
+pcie2: 400 Gbps, PCIe 57.6 GB/s, {'PCIE_RD_GPU_NS': 2700, 'PCIE_DB_GPU_NS': 1290, 'PCIE_WR_GPU_NS': 1290} (Loom {'PCIE_RD_GPU_NS': 2700, 'PCIE_DB_GPU_NS': 1290, 'PCIE_WR_GPU_NS': 1290}) (model)
+  latency      0 B: RDMA     9.14 Loom     3.77 us  RDMA/Loom 2.42
+  latency     64 B: RDMA    11.85 Loom     3.78 us  RDMA/Loom 3.14
+  latency    256 B: RDMA    11.85 Loom     3.79 us  RDMA/Loom 3.13
+  latency   1024 B: RDMA    11.86 Loom     3.85 us  RDMA/Loom 3.08
+  latency   4096 B: RDMA    11.92 Loom     4.08 us  RDMA/Loom 2.92
+  latency  16384 B: RDMA    12.13 Loom     4.33 us  RDMA/Loom 2.80
+  latency  65536 B: RDMA    12.98 Loom     5.33 us  RDMA/Loom 2.44
+  stream     4096 B: RDMA   30.74 Loom   44.94 GB/s  Loom/RDMA 1.46
+  stream    65536 B: RDMA   48.28 Loom   48.74 GB/s  Loom/RDMA 1.01
+  stream  1048576 B: RDMA   48.36 Loom   48.74 GB/s  Loom/RDMA 1.01
+  all-to-all 16 GPUs 16 KiB: RDMA 23.93 Loom 7.87 us  RDMA/Loom 3.04
+
+stack0.25: 400 Gbps, PCIe 57.6 GB/s, {'NIC_TX_NS': 65.0, 'NIC_RX_NS': 147.5} (Loom {'NIC_TX_NS': 86.0, 'NIC_RX_NS': 154.5}) (model)
+  latency      0 B: RDMA     4.52 Loom     1.84 us  RDMA/Loom 2.45
+  latency     64 B: RDMA     5.87 Loom     1.85 us  RDMA/Loom 3.17
+  latency    256 B: RDMA     5.87 Loom     1.86 us  RDMA/Loom 3.15
+  latency   1024 B: RDMA     5.89 Loom     1.92 us  RDMA/Loom 3.07
+  latency   4096 B: RDMA     5.94 Loom     2.15 us  RDMA/Loom 2.76
+  latency  16384 B: RDMA     6.15 Loom     2.40 us  RDMA/Loom 2.56
+  latency  65536 B: RDMA     7.01 Loom     3.40 us  RDMA/Loom 2.06
+  stream     4096 B: RDMA   39.72 Loom   46.88 GB/s  Loom/RDMA 1.18
+  stream    65536 B: RDMA   48.65 Loom   48.88 GB/s  Loom/RDMA 1.00
+  stream  1048576 B: RDMA   48.69 Loom   48.88 GB/s  Loom/RDMA 1.00
+  all-to-all 16 GPUs 16 KiB: RDMA 11.97 Loom 4.01 us  RDMA/Loom 2.98
+
+stack0.5: 400 Gbps, PCIe 57.6 GB/s, {'NIC_TX_NS': 130.0, 'NIC_RX_NS': 295.0} (Loom {'NIC_TX_NS': 151.0, 'NIC_RX_NS': 302.0}) (model)
+  latency      0 B: RDMA     4.73 Loom     2.06 us  RDMA/Loom 2.30
+  latency     64 B: RDMA     6.08 Loom     2.06 us  RDMA/Loom 2.95
+  latency    256 B: RDMA     6.09 Loom     2.08 us  RDMA/Loom 2.93
+  latency   1024 B: RDMA     6.10 Loom     2.13 us  RDMA/Loom 2.86
+  latency   4096 B: RDMA     6.15 Loom     2.36 us  RDMA/Loom 2.60
+  latency  16384 B: RDMA     6.37 Loom     2.61 us  RDMA/Loom 2.44
+  latency  65536 B: RDMA     7.22 Loom     3.62 us  RDMA/Loom 2.00
+  stream     4096 B: RDMA   39.56 Loom   46.65 GB/s  Loom/RDMA 1.18
+  stream    65536 B: RDMA   48.63 Loom   48.86 GB/s  Loom/RDMA 1.00
+  stream  1048576 B: RDMA   48.67 Loom   48.86 GB/s  Loom/RDMA 1.00
+  all-to-all 16 GPUs 16 KiB: RDMA 12.40 Loom 4.44 us  RDMA/Loom 2.79
+
+stack1.5: 400 Gbps, PCIe 57.6 GB/s, {'NIC_TX_NS': 390.0, 'NIC_RX_NS': 885.0} (Loom {'NIC_TX_NS': 411.0, 'NIC_RX_NS': 892.0}) (model)
+  latency      0 B: RDMA     5.58 Loom     2.91 us  RDMA/Loom 1.92
+  latency     64 B: RDMA     6.93 Loom     2.91 us  RDMA/Loom 2.38
+  latency    256 B: RDMA     6.94 Loom     2.93 us  RDMA/Loom 2.37
+  latency   1024 B: RDMA     6.95 Loom     2.98 us  RDMA/Loom 2.33
+  latency   4096 B: RDMA     7.00 Loom     3.21 us  RDMA/Loom 2.18
+  latency  16384 B: RDMA     7.22 Loom     3.46 us  RDMA/Loom 2.08
+  latency  65536 B: RDMA     8.07 Loom     4.47 us  RDMA/Loom 1.81
+  stream     4096 B: RDMA   38.94 Loom   45.79 GB/s  Loom/RDMA 1.18
+  stream    65536 B: RDMA   48.57 Loom   48.80 GB/s  Loom/RDMA 1.00
+  stream  1048576 B: RDMA   48.61 Loom   48.80 GB/s  Loom/RDMA 1.00
+  all-to-all 16 GPUs 16 KiB: RDMA 14.10 Loom 6.14 us  RDMA/Loom 2.30
+
+stack2: 400 Gbps, PCIe 57.6 GB/s, {'NIC_TX_NS': 520, 'NIC_RX_NS': 1180} (Loom {'NIC_TX_NS': 541, 'NIC_RX_NS': 1187}) (model)
+  latency      0 B: RDMA     6.00 Loom     3.33 us  RDMA/Loom 1.80
+  latency     64 B: RDMA     7.36 Loom     3.34 us  RDMA/Loom 2.20
+  latency    256 B: RDMA     7.36 Loom     3.35 us  RDMA/Loom 2.20
+  latency   1024 B: RDMA     7.37 Loom     3.41 us  RDMA/Loom 2.16
+  latency   4096 B: RDMA     7.43 Loom     3.64 us  RDMA/Loom 2.04
+  latency  16384 B: RDMA     7.64 Loom     3.89 us  RDMA/Loom 1.97
+  latency  65536 B: RDMA     8.49 Loom     4.89 us  RDMA/Loom 1.74
+  stream     4096 B: RDMA   38.63 Loom   45.37 GB/s  Loom/RDMA 1.17
+  stream    65536 B: RDMA   48.54 Loom   48.77 GB/s  Loom/RDMA 1.00
+  stream  1048576 B: RDMA   48.58 Loom   48.77 GB/s  Loom/RDMA 1.00
+  all-to-all 16 GPUs 16 KiB: RDMA 14.95 Loom 6.99 us  RDMA/Loom 2.14
 
 ## Collectives
 op           GPUs     bytes        rdma     loom      x

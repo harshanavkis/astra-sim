@@ -13,10 +13,6 @@ buffer two layers later (double buffering, as DeepEP's low-latency mode): it dep
 back. With 2 micro-batches (DeepSeek's decode overlap) the GPU's compute alternates between them. After the last layer,
 the LM head. Tags: dispatch 1 + 1000 m + l, combine 100001 + 1000 m + l (unique per message pair; run with
 MSG_SPLIT_BYTES 7168 + MSG_SPLIT_HIGH_TAG 100000 14336: one put per token, as Fig 11, and ASTRA_CONCURRENT_SENDS=1).
-HOLD=1 (owner 2026-10-21): the sending GPU is busy until its own sends are released (the dispatch / combine kernel ends
-when the sender may reuse its buffer, as Section 2's sender busy time): EXPERT and SHARED also depend on the GPU's own
-dispatch sends of the layer, the next layer's ATT also on its own combine sends. Without HOLD a send occupies only the
-network, and a GPU's compute waits only for the data it receives.
 Compute nodes: num_ops = FLOPs, tensor_size = bytes read and written (weights FP8, KV cache and activations BF16).
 DeepSeek-V3 (its config.json): hidden 7168, 61 layers (3 dense, FFN 18432), 256 routed experts (FFN 2048) + 1 shared,
 top-8, 128 heads, q_lora 1536, kv_lora 512, rope 64, nope 128, v_head 128, vocabulary 129280.
@@ -53,7 +49,6 @@ def experts(g, t, l):
 
 
 out, ep, T, L, MB = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
-HOLD = os.environ.get('HOLD') == '1'
 assert E % ep == 0 and MB in (1, 2) and T >= MB
 os.makedirs(out, exist_ok=True)
 per = E // ep
@@ -122,18 +117,16 @@ for m in range(MB):
             sends.setdefault((g, "d", l), []).append(sid)
             rx[d].append(comm(d, "recv", g, k * DTOK, dtag))
             msgs += 1
-        held = {r: sends.get((r, "d", l), []) if HOLD else [] for r in range(ep)}   # the GPU's own dispatch sends
         ex = {r: comp(r, f"exp{l}", 2 * pairs.get(r, 0) * EXP_W, len(hit[r]) * EXP_W + pairs.get(r, 0) * (DTOK + CTOK),
-                      [a[r]] + rx[r] + held[r]) for r in range(ep)}
-        sh = {r: comp(r, f"shared{l}", 2 * b * EXP_W, EXP_W + 4 * b * H, [a[r]] + held[r]) for r in range(ep)}
+                      [a[r]] + rx[r]) for r in range(ep)}
+        sh = {r: comp(r, f"shared{l}", 2 * b * EXP_W, EXP_W + 4 * b * H, [a[r]]) for r in range(ep)}
         crx = {r: [] for r in range(ep)}
         for (g, d), k in sorted(n.items()):                # combine: d returns g's tokens
             sid = comm(d, "send", g, k * CTOK, ctag, [ex[d]] + sends.get((d, "c", l - 2), []))
             sends.setdefault((d, "c", l), []).append(sid)
             crx[g].append(comm(g, "recv", d, k * CTOK, ctag))
             msgs += 1
-        ready = {r: crx[r] + [sh[r]] + ([ex[r]] if own[r] else []) + (sends.get((r, "c", l), []) if HOLD else [])
-                 for r in range(ep)}
+        ready = {r: crx[r] + [sh[r]] + ([ex[r]] if own[r] else []) for r in range(ep)}
     for r in range(ep):
         comp(r, "lm_head", 2 * b * HEAD_W, HEAD_W + 4 * b * H, ready[r])
 
