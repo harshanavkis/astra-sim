@@ -138,11 +138,11 @@ def strip_a(out):
     save(fig, out, 'strip-a')
 
 
-# ----------------------------------------------------------------------- C: sensitivity + training (model)
+# ----------------------------------------------------------------------- C: sensitivity (model)
 def strip_c(out):
-    """(a-c) sensitivity of Loom's lead, as Fig 13 (one message 64 B .. 64 KiB, all-to-all of 16 KiB per GPU on 16 GPUs),
-    (d) training at full depth (Fig 14's 8 groups): slowest GPU's iteration, normalised to RDMA, compute + exposed."""
-    fig, axes = strip(4, ratios=(1, 1, 1, 1.35), bottom=0.47)
+    """(a-c) sensitivity of Loom's lead, as Fig 13 (one message 64 B .. 64 KiB, all-to-all of 16 KiB per GPU on 16 GPUs).
+    Training moved to strip B (owner 2026-10-22)."""
+    fig, axes = strip(3, bottom=0.47)
     rows = [l.split('\t') for l in open(os.path.join(pe.X, pe.SWEEP)).read().splitlines()[1:]]
     v = {(r[0], r[1], r[2], int(r[3])): float(r[4]) for r in rows}
     scales = (0.25, 0.5, 1, 1.5, 2)
@@ -167,7 +167,16 @@ def strip_c(out):
         finish(ax, 'RDMA / Loom' if ax is axes[0] else None, xl)
         ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda q, _: f'{q:g}×'))
         title(ax, ttl)
-    ax = axes[3]
+    h = [Line2D([0], [0], color=c, marker=mk, linestyle='--' if e == 'a2a' else '-', **LN) for e, _, c, mk, _ in series]
+    lab = [f'one message, {n}' if e == 'lat' else 'all-to-all, 16 KiB/GPU' for e, _, _, _, n in series]
+    h.append(Line2D([0], [0], color='grey', linestyle=':', linewidth=0.8))
+    lab.append('nominal')
+    legend(fig, h, lab, ncol=3)
+    save(fig, out, 'strip-c')
+
+
+def panel_training(ax, ttl):
+    """Training at full depth (Fig 14's 8 groups): slowest GPU's iteration, normalised to RDMA, compute + exposed."""
     ORDER = (('dp', 'DP'), ('fsdp', 'FSDP'), ('cp', 'CP'), ('pp', 'PP'), ('hybrid', '3D'), ('l80', '3D 80B'),
              ('moe_mixed', 'MoE mix'), ('moe_scaleout', 'MoE out'))
     t = {}
@@ -189,15 +198,7 @@ def strip_c(out):
     ax.set_xlim(-0.6, len(ORDER) - 0.4); ax.set_ylim(0, 1.15)
     finish(ax, 'Iteration [norm.]')
     ax.grid(False, axis='x')
-    title(ax, '(d) Training ' + DOWN)
-    h = [Line2D([0], [0], color=c, marker=mk, linestyle='--' if e == 'a2a' else '-', **LN) for e, _, c, mk, _ in series]
-    lab = [f'one message, {n}' if e == 'lat' else 'all-to-all, 16 KiB/GPU' for e, _, _, _, n in series]
-    h += [Line2D([0], [0], color='grey', linestyle=':', linewidth=0.8),
-          Patch(facecolor=RDMA, alpha=0.55, edgecolor='k', linewidth=0.4), Patch(facecolor=LOOM, alpha=0.55, edgecolor='k', linewidth=0.4),
-          Patch(facecolor='white', edgecolor='k', hatch='//////', linewidth=0.4)]
-    lab += ['nominal', 'RDMA', 'Loom', 'exposed comm.']
-    legend(fig, h, lab, ncol=5)
-    save(fig, out, 'strip-c')
+    title(ax, ttl + DOWN)
 
 
 # ----------------------------------------------------------------------- B: MoE decode + collectives at scale (model)
@@ -226,26 +227,29 @@ def moe_ranks(op, ep, t, var):
 TOKENS = (1, 4, 16, 64, 128)
 
 
-def panel_moe(fig, gs, op, ttl):
-    """Fig 4's form (owner 2026-10-21): one linear sub-panel per token count; bars = slowest of the 256 GPUs until the
-    sender may reuse its buffer (RDMA, Loom), dashed = until the receiver has all tokens (slowest GPU); red = RDMA / Loom
-    sender time."""
-    sub = gs.subgridspec(1, 3, wspace=0.7)
-    Wb = 0.62
+def panel_moe(fig, gs, ttl):
+    """Fig 4's form (owner 2026-10-22: dispatch and combine in one plot, as Fig 4a): one linear sub-panel per token count
+    with a dispatch and a combine group; bars = slowest of the 256 GPUs until the sender may reuse its buffer (RDMA, Loom),
+    dashed = until the receiver has all tokens (slowest GPU); red = RDMA / Loom sender time per group."""
+    sub = gs.subgridspec(1, 3, wspace=0.36)
+    Wb, X0 = 0.42, (('dispatch', 0.0), ('combine', 1.3))
     for i, t in enumerate((1, 16, 128)):
         ax = fig.add_subplot(sub[0, i])
-        v = {var: [moe_ranks(op, 256, t, var)[k].max() for k in (0, 1)] for var in ('rdma', 'loom')}
-        top = max(max(x) for x in v.values())
-        for j, var in enumerate(('rdma', 'loom')):
-            snd, rcv = v[var]
-            ax.bar(j, snd, Wb, color=RDMA if var == 'rdma' else LOOM, alpha=0.55, edgecolor='k', linewidth=0.4)
-            ax.hlines(rcv, j - Wb / 2 - 0.06, j + Wb / 2 + 0.06, colors='k', linestyles='--', linewidth=1.0)
-        ax.text(0.5, top * 1.04, f'{v["rdma"][0] / v["loom"][0]:.1f}×', ha='center', va='bottom', fontsize=FONT['note'],
-                color='firebrick')
-        ax.set_xticks([0.5]); ax.set_xticklabels([str(t)]); ax.tick_params(axis='x', length=0)
-        ax.set_xlim(-0.6, 1.6); ax.set_ylim(0, top * 1.25)
+        v = {op: {var: [moe_ranks(op, 256, t, var)[k].max() for k in (0, 1)] for var in ('rdma', 'loom')} for op, _ in X0}
+        top = max(max(x) for g in v.values() for x in g.values())
+        for op, x0 in X0:
+            for j, var in enumerate(('rdma', 'loom')):
+                snd, rcv = v[op][var]
+                x = x0 + j * Wb
+                ax.bar(x, snd, Wb, color=RDMA if var == 'rdma' else LOOM, alpha=0.55, edgecolor='k', linewidth=0.4)
+                ax.hlines(rcv, x - Wb / 2 - 0.04, x + Wb / 2 + 0.04, colors='k', linestyles='--', linewidth=1.0)
+            g = max(max(x) for x in v[op].values())
+            ax.text(x0 + Wb / 2, g + 0.04 * top, f'{v[op]["rdma"][0] / v[op]["loom"][0]:.1f}×', ha='center', va='bottom',
+                    fontsize=FONT['note'], color='firebrick')
+        ax.set_xticks([x0 + Wb / 2 for _, x0 in X0]); ax.set_xticklabels(['disp.', 'comb.']); ax.tick_params(axis='x', length=0)
+        ax.set_xlim(-0.4, X0[-1][1] + Wb + 0.4); ax.set_ylim(0, top * 1.25)
         ax.yaxis.set_major_locator(mticker.MaxNLocator(3))
-        finish(ax, 'Sender busy [µs]' if i == 0 else None, 'Tokens per GPU' if i == 1 else None)
+        finish(ax, 'Sender busy [µs]' if i == 0 else None, f'{t} token{"s" if t > 1 else ""}')
         ax.grid(False, axis='x')
         if i == 1:
             title(ax, ttl + DOWN)
@@ -253,11 +257,12 @@ def panel_moe(fig, gs, op, ttl):
 
 def strip_b(out):
     """(a) one decode step of DeepSeek-V3 at EP256 (tools/gen_decode.py, roofline compute): slowest GPU, compute + exposed
-    communication, normalised to RDMA per token count (only complete RDMA / Loom pairs), red = RDMA / Loom; (b, c)
-    dispatch / combine at EP256 (Fig 11's runs) in Fig 4's form (panel_moe); (d) collectives on 64 GPUs."""
+    communication, normalised to RDMA per token count (only complete RDMA / Loom pairs), red = RDMA / Loom; (b) dispatch
+    and combine at EP256 (Fig 11's runs) in one plot, Fig 4's form (panel_moe); (c) collectives on 64 GPUs; (d) training
+    (panel_training, moved from strip C, owner 2026-10-22)."""
     h = HGT + 0.07 + 0.13 + TITLE_H
     fig = plt.figure(figsize=(W, h))
-    gs = fig.add_gridspec(1, 4, width_ratios=(0.9, 1.5, 1.5, 1.4), wspace=0.36, left=0.055, right=0.995,
+    gs = fig.add_gridspec(1, 4, width_ratios=(0.95, 2.3, 1.1, 1.4), wspace=0.34, left=0.055, right=0.995,
                           top=1 - (0.43 + TITLE_H) / h, bottom=0.47 / h)
     ax = fig.add_subplot(gs[0, 0])
     Wb = 0.38
@@ -279,9 +284,8 @@ def strip_b(out):
     finish(ax, 'Decode step [norm.]', 'Tokens per GPU')
     ax.grid(False, axis='x')
     title(ax, '(a) Decode step ' + DOWN)
-    panel_moe(fig, gs[0, 1], 'dispatch', '(b) Dispatch ')
-    panel_moe(fig, gs[0, 2], 'combine', '(c) Combine ')
-    ax = fig.add_subplot(gs[0, 3])
+    panel_moe(fig, gs[0, 1], '(b) Dispatch and combine ')
+    ax = fig.add_subplot(gs[0, 2])
     rows = list(csv.DictReader(open(os.path.join(E, 'e8_an/coll/coll.tsv')), delimiter='\t'))
     v = {(r['op'], int(r['gpus']), int(r['bytes']), r['variant']): float(r['time_us']) for r in rows}
     sizes = sorted({k[2] for k in v if k[1] == 64})
@@ -292,7 +296,8 @@ def strip_b(out):
     size_ticks(ax, sizes)
     finish(ax, 'RDMA / Loom time', 'Data per GPU')
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda q, _: f'{q:g}\u00d7'))
-    title(ax, '(d) Collectives ' + UP)
+    title(ax, '(c) Collectives ' + UP)
+    panel_training(fig.add_subplot(gs[0, 3]), '(d) Training ')
     hd = [Patch(facecolor=RDMA, alpha=0.55, edgecolor='k', linewidth=0.4), Patch(facecolor=LOOM, alpha=0.55, edgecolor='k', linewidth=0.4),
           Patch(facecolor='0.6', alpha=0.55, edgecolor='k', linewidth=0.4), Patch(facecolor='white', edgecolor='k', hatch='//////', linewidth=0.4),
           Line2D([0], [0], color='k', linestyle='--', linewidth=1.0), Patch(visible=False)]
