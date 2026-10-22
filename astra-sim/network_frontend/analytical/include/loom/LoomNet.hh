@@ -46,6 +46,8 @@ struct Config {
     uint32_t mtu = 1000, wire_bytes = 0;     // PACKET_PAYLOAD_SIZE, WIRE_BYTES_PER_PACKET
     uint32_t atomic_wire = 20;               // ATOMIC_WIRE: an atomic request's extra bytes on the wire (AtomicETH 28 B)
     uint64_t msg_split = 0;                  // MSG_SPLIT_BYTES: puts per message (0 = one put)
+    int split_high_tag = -1;                 // MSG_SPLIT_HIGH_TAG <tag> <bytes>: messages with comm_tag >= tag are split at
+    uint64_t split_high = 0;                 // <bytes> instead (MoE decode: dispatch 7 KiB and combine 14 KiB puts in one run)
     bool release_on_post = false;            // SENDER_RELEASE post
     std::map<int, int> node_host;            // NODE_HOST <node> <host>: the node's NIC sits on that host's PCIe
 
@@ -92,6 +94,7 @@ struct Config {
             else if (k == "PACKET_PAYLOAD_SIZE") is >> mtu;
             else if (k == "WIRE_BYTES_PER_PACKET") is >> wire_bytes;
             else if (k == "MSG_SPLIT_BYTES") is >> msg_split;
+            else if (k == "MSG_SPLIT_HIGH_TAG") is >> split_high_tag >> split_high;
             else if (k == "ATOMIC_WIRE") is >> atomic_wire;
             else if (k == "SENDER_RELEASE") { is >> s; release_on_post = (s == "post"); }
             else if (k == "NODE_HOST") { int a, b; is >> a >> b; node_host[a] = b; }

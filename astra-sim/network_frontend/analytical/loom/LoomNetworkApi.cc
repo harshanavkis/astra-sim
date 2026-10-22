@@ -1,7 +1,7 @@
 // ASTRA-sim network API on the LoomNet analytical model (e8-astrasim/ANALYTICAL.md).
 // A message between two GPUs of one server: NVLink by its bandwidth only (size / NVLINK_GBPS, arriving
 // NVLINK_LAT_NS later; identical for both systems, as the ns-3 frontend's local_send). A message between servers:
-// its puts (MSG_SPLIT_BYTES each, 0 = one put) and then an 8 B signal put on the pair's queue pair; the receiver has
+// its puts (MSG_SPLIT_BYTES each, 0 = one put; MSG_SPLIT_HIGH_TAG: other size from a tag on) and then an 8 B signal put on the pair's queue pair; the receiver has
 // the message when it sees the signal; the sender is released when it may reuse its buffer: Loom once its stores
 // (the signal's last) have left the GPU, RDMA at the signal's CQE (SENDER_RELEASE post: at once). The sends a GPU
 // issues at the same time are posted interleaved, one put of each in turn (as the ns-3 frontend's nic_flush).
@@ -94,7 +94,8 @@ void flush(void* p) {
             if (done[i]) continue;
             auto& s = v[i];
             if (off[i] < s.size) {
-                const uint64_t b = std::min<uint64_t>(split ? split : s.size, s.size - off[i]);
+                const uint64_t sp = (m.cfg.split_high_tag >= 0 && s.tag >= m.cfg.split_high_tag) ? m.cfg.split_high : split;
+                const uint64_t b = std::min<uint64_t>(sp ? sp : s.size, s.size - off[i]);
                 m.put(src, s.dst, 0, b, t, LoomNet::PutCallbacks{});
                 off[i] += b;
             }
