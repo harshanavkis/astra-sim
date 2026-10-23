@@ -1,0 +1,2 @@
+decflush_ep256_t64_l4096_mb1__rdma /scratch/harshanavkis/loom-proj/e8-astrasim/traces/decode_hold/ep256_t64_l4096_mb1/decode /scratch/harshanavkis/loom-proj/e8-astrasim/e8/cfg/system_decode.json /scratch/harshanavkis/loom-proj/e8-astrasim/e8_an/decode/cfg/rdma_ep256.txt
+decflush_ep256_t64_l4096_mb1__loom /scratch/harshanavkis/loom-proj/e8-astrasim/traces/decode_hold/ep256_t64_l4096_mb1/decode /scratch/harshanavkis/loom-proj/e8-astrasim/e8/cfg/system_decode.json /scratch/harshanavkis/loom-proj/e8-astrasim/e8_an/decode/cfg/loom_ep256.txt

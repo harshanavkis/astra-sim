@@ -16,7 +16,10 @@ MSG_SPLIT_BYTES 7168 + MSG_SPLIT_HIGH_TAG 100000 14336: one put per token, as Fi
 Compute nodes: num_ops = FLOPs, tensor_size = bytes read and written (weights FP8, KV cache and activations BF16).
 DeepSeek-V3 (its config.json): hidden 7168, 61 layers (3 dense, FFN 18432), 256 routed experts (FFN 2048) + 1 shared,
 top-8, 128 heads, q_lora 1536, kv_lora 512, rope 64, nope 128, v_head 128, vocabulary 129280.
-  gen_decode.py <out dir> <EP = GPUs> <tokens per GPU T> <context L> <micro-batches 1|2>   -> <out>/decode.<rank>.et"""
+  gen_decode.py <out dir> <EP = GPUs> <tokens per GPU T> <context L> <micro-batches 1|2>   -> <out>/decode.<rank>.et
+LOOP=<dispatch ns>,<combine ns> (owner 2026-10-22): the GPU is busy for its measured send loop (Section 2's harness) after
+the attention (dispatch) and the experts (combine); the shared expert, the experts and the next layer wait for it. The
+network config spreads the loop's posts (POST_LOOP_NS). Without LOOP the traces are as before (byte-identical)."""
 import os, sys
 sys.path.insert(0, "/scratch/harshanavkis/loom-proj/opus-ref/Opus/simulation/symbolic_tensor_graph/symbolic_tensor_graph/chakra/backends/chakra_00_4_backend/et_def")
 import et_def_pb2 as pb
@@ -49,6 +52,7 @@ def experts(g, t, l):
 
 
 out, ep, T, L, MB = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
+LOOP = tuple(float(x) for x in os.environ['LOOP'].split(',')) if os.environ.get('LOOP') else None   # ns
 assert E % ep == 0 and MB in (1, 2) and T >= MB
 os.makedirs(out, exist_ok=True)
 per = E // ep
@@ -117,16 +121,19 @@ for m in range(MB):
             sends.setdefault((g, "d", l), []).append(sid)
             rx[d].append(comm(d, "recv", g, k * DTOK, dtag))
             msgs += 1
+        # the dispatch's send loop: one memory-bound node of LOOP[0] ns (num_ops 1, bytes = ns x 4.8 TB/s)
+        busy = {r: [comp(r, f"dloop{l}", 1, LOOP[0] * 4800, [a[r]])] for r in range(ep)} if LOOP else {r: [] for r in range(ep)}
         ex = {r: comp(r, f"exp{l}", 2 * pairs.get(r, 0) * EXP_W, len(hit[r]) * EXP_W + pairs.get(r, 0) * (DTOK + CTOK),
-                      [a[r]] + rx[r]) for r in range(ep)}
-        sh = {r: comp(r, f"shared{l}", 2 * b * EXP_W, EXP_W + 4 * b * H, [a[r]]) for r in range(ep)}
+                      [a[r]] + rx[r] + busy[r]) for r in range(ep)}
+        sh = {r: comp(r, f"shared{l}", 2 * b * EXP_W, EXP_W + 4 * b * H, [a[r]] + busy[r]) for r in range(ep)}
         crx = {r: [] for r in range(ep)}
         for (g, d), k in sorted(n.items()):                # combine: d returns g's tokens
             sid = comm(d, "send", g, k * CTOK, ctag, [ex[d]] + sends.get((d, "c", l - 2), []))
             sends.setdefault((d, "c", l), []).append(sid)
             crx[g].append(comm(g, "recv", d, k * CTOK, ctag))
             msgs += 1
-        ready = {r: crx[r] + [sh[r]] + ([ex[r]] if own[r] else []) for r in range(ep)}
+        cbusy = {r: [comp(r, f"cloop{l}", 1, LOOP[1] * 4800, [ex[r]])] for r in range(ep)} if LOOP else {r: [] for r in range(ep)}
+        ready = {r: crx[r] + [sh[r]] + ([ex[r]] if own[r] else []) + cbusy[r] for r in range(ep)}
     for r in range(ep):
         comp(r, "lm_head", 2 * b * HEAD_W, HEAD_W + 4 * b * H, ready[r])
 

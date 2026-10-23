@@ -1,0 +1,2 @@
+declp_ep256_t16_l4096_mb1__rdma /scratch/harshanavkis/loom-proj/e8-astrasim/traces/decode_loop/ep256_t16_l4096_mb1_rdma/decode /scratch/harshanavkis/loom-proj/e8-astrasim/e8/cfg/system_decode.json /scratch/harshanavkis/loom-proj/e8-astrasim/e8_an/decode_loop/cfg/rdma_ep256_t16.txt
+declp_ep256_t16_l4096_mb1__loom /scratch/harshanavkis/loom-proj/e8-astrasim/traces/decode_loop/ep256_t16_l4096_mb1_loom/decode /scratch/harshanavkis/loom-proj/e8-astrasim/e8/cfg/system_decode.json /scratch/harshanavkis/loom-proj/e8-astrasim/e8_an/decode_loop/cfg/loom_ep256_t16.txt

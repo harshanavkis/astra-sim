@@ -1,8 +1,8 @@
-# LoomNet analytical model: all results, 2026-10-21 23:54 UTC (model unless marked measured)
-binary fc8f6076 model f74bf3ed
+# LoomNet analytical model: all results, 2026-10-22 10:13 UTC (model unless marked measured)
+binary 167bf321 model d5c508c9
 
 ## Validation against the prototype (measured vs model)
-# ANALYTICAL model (an_replay) vs prototype, 2026-10-21 23:55; configs /home/harshanavkis/loom-experiments/val_model/runs_an/20261021_2355/{loom,rdma}.txt
+# ANALYTICAL model (an_replay) vs prototype, 2026-10-22 10:14; configs /home/harshanavkis/loom-experiments/val_model/runs_an/20261022_1014/{loom,rdma}.txt
 # fitted: link delay 1689 ns per link (2 links), so that loom 8 B one-way = 4.07 us measured (model with 0 delay 0.69 us -> 4.07 us); PCIe 15.04 GB/s (computed, Gen3 x16 MPS 512)
 
 E2 one-way, us (measured median of 4,000; model)

@@ -1,0 +1,59 @@
+path ordered
+nodes 0 1
+nqp 24
+reap 1
+signal 8700 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
+atomic 0 8192 0
+atomic 1 8192 1
+atomic 2 8192 2
+atomic 3 8192 3
+atomic 4 8192 4
+atomic 5 8192 5
+atomic 6 8192 6
+atomic 7 8192 7
+atomic 8 8192 8
+atomic 9 8192 9
+atomic 10 8192 10
+atomic 11 8192 11
+atomic 12 8192 12
+atomic 13 8192 13
+atomic 14 8192 14
+atomic 15 8192 15
+atomic 16 8192 16
+atomic 17 8192 17
+atomic 18 8192 18
+atomic 19 8192 19
+atomic 20 8192 20
+atomic 21 8192 21
+atomic 22 8192 22
+atomic 23 8192 23
+msg 1 3580 3 14336 0
+msg 2 3632 12 14336 0
+msg 3 3684 15 14336 0
+msg 4 3736 18 14336 0
+msg 5 3788 21 14336 0
+msg 0 3840 0 14336 0
+ring 0 8192 2
+ring 1 8192 1
+ring 2 8192 1
+ring 3 8192 2
+ring 4 8192 1
+ring 5 8192 1
+ring 6 8192 1
+ring 7 8192 1
+ring 8 8192 1
+ring 9 8192 1
+ring 10 8192 1
+ring 11 8192 1
+ring 12 8192 2
+ring 13 8192 1
+ring 14 8192 1
+ring 15 8192 2
+ring 16 8192 1
+ring 17 8192 1
+ring 18 8192 2
+ring 19 8192 1
+ring 20 8192 1
+ring 21 8192 2
+ring 22 8192 1
+ring 23 8192 1
