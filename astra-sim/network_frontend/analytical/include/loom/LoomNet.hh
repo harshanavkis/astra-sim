@@ -50,6 +50,18 @@ struct Config {
     uint64_t split_high = 0;                 // <bytes> instead (MoE decode: dispatch 7 KiB and combine 14 KiB puts in one run)
     bool release_on_post = false;            // SENDER_RELEASE post
     std::map<int, int> node_host;            // NODE_HOST <node> <host>: the node's NIC sits on that host's PCIe
+    // POST_LOOP_NS <L> <first> <last> (tags below MSG_SPLIT_HIGH_TAG) / POST_LOOP_HIGH_NS (from it): the GPU's send loop
+    // (measured, Section 2's harness): the puts of the sends a GPU issues together are posted evenly between first x L
+    // and last x L after the issue, every signal at L (0 = off: all at the issue, as before)
+    double loop_ns[2] = {0, 0}, loop_first[2] = {0, 0}, loop_last[2] = {0, 0};
+    uint32_t db_batch = 1;                   // DOORBELL_BATCH: RDMA rings a queue pair at every n-th put of a send loop
+                                             // (1 = every put; DeepEP 4, ibgda_device.cuh; 0 = only with the signal)
+    // STAGE_COPY <ns> <GB/s> <chunk bytes> (RDMA only, 0 = off): the sending GPU copies each put into its registered
+    // buffer before posting it (DeepEP's send buffer, NCCL's connection buffer slot): <ns> + bytes / <GB/s>, one GPU's
+    // copies back to back; puts are cut to <chunk> so a chunk's copy overlaps the previous chunk's transfer. Not with a
+    // send loop (POST_LOOP_NS: its measured time contains the copy). The signal follows the last copied put.
+    double stage_ns = 0, stage_gbps = 0;
+    uint64_t stage_chunk = 0;
 
     static int ep(const std::string& s) { return s == "host" ? HOST : s == "nic" ? NIC : GPU; }
 
@@ -98,6 +110,10 @@ struct Config {
             else if (k == "ATOMIC_WIRE") is >> atomic_wire;
             else if (k == "SENDER_RELEASE") { is >> s; release_on_post = (s == "post"); }
             else if (k == "NODE_HOST") { int a, b; is >> a >> b; node_host[a] = b; }
+            else if (k == "POST_LOOP_NS") is >> loop_ns[0] >> loop_first[0] >> loop_last[0];
+            else if (k == "POST_LOOP_HIGH_NS") is >> loop_ns[1] >> loop_first[1] >> loop_last[1];
+            else if (k == "DOORBELL_BATCH") is >> db_batch;
+            else if (k == "STAGE_COPY") is >> stage_ns >> stage_gbps >> stage_chunk;
         }
         return true;
     }
@@ -331,7 +347,7 @@ class Model {
         uint64_t idx = 0;            // its WQE index on the queue pair (the order of the QP's byte stream)
         uint64_t seq = 0;            // global posting order
         PutCallbacks cb;
-        double t_post = 0, t_wqe = -1, t_wire0 = -1, t_wire1 = -1, t_out = -1;
+        double t_post = 0, t_db = -1, t_wqe = -1, t_wire0 = -1, t_wire1 = -1, t_out = -1;   // t_db: doorbell landed
         double data_last = 0;        // all its bytes in the sending NIC / Loom
         uint64_t first_pkt(const Config& c) const { return std::min<uint64_t>(bytes, c.mtu); }
     };
@@ -430,6 +446,7 @@ class Model {
     }
 
     void doorbell(const PutP& p, double t) {
+        p->t_db = t;
         if (cfg.bf) { wqe(p, t); return; }
         Qp& q = qps[std::make_tuple(p->src, p->dst, p->qp)];
         q.rung.push_back(p);
@@ -581,15 +598,18 @@ class Model {
         const double seen = i1 + c.wr_lat(c.rx_mem) + c.rx_poll_ns;
         emit(p->cb.seen, seen);
         if (trace_src == p->src)
-            fprintf(stderr, "loomnet_put src %d dst %d bytes %lu post %.0f wqe %.0f data1 %.0f wire0 %.0f wire1 %.0f "
-                    "a1 %.0f seen %.0f\n", p->src, p->dst, (unsigned long)p->bytes, p->t_post, p->t_wqe, p->data_last,
-                    p->t_wire0, p->t_wire1, a1, seen);
+            fprintf(stderr, "loomnet_put src %d dst %d bytes %lu post %.0f db %.0f wqe %.0f data1 %.0f out %.0f wire0 %.0f "
+                    "wire1 %.0f a1 %.0f seen %.0f\n", p->src, p->dst, (unsigned long)p->bytes, p->t_post, p->t_db, p->t_wqe,
+                    p->data_last, p->t_out, p->t_wire0, p->t_wire1, a1, seen);
         if (c.push) return;
         const double ack = a1 + c.nic_rx_ns + prop + (nsw + 1) * c.wire_bytes / N;
         at(ack, [this, p](double ta) {
             // a posted write: behind the NIC's earlier posted writes (received data) into memory
             const double q1 = pcie(p->src).hold(NIC, cfg.cq_mem, 64, ta);
             emit(p->cb.cqe, q1 + cfg.wr_lat(cfg.cq_mem) + cfg.cqe_poll_ns);
+            if (trace_src == p->src)
+                fprintf(stderr, "loomnet_cqe src %d dst %d bytes %lu ack %.0f cqe %.0f\n", p->src, p->dst,
+                        (unsigned long)p->bytes, ta, q1 + cfg.wr_lat(cfg.cq_mem) + cfg.cqe_poll_ns);
         });
     }
 };

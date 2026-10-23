@@ -26,6 +26,7 @@ struct Pending {
 };
 std::map<int, std::vector<Pending>> pending;               // src -> sends issued at this time
 std::map<int, uint64_t> last_release, last_recv;           // per rank, ns (loom_rank line)
+std::map<int, double> stage_busy;                          // STAGE_COPY: a GPU's staging copies, busy until (ns)
 int finished_ranks = 0;
 std::shared_ptr<LoomNet::Model> g_model;
 
@@ -60,6 +61,29 @@ void arrival_at(double t, int tag, int src, int dst, uint64_t count, int chunk_i
     at(t, do_arrival, new Arrival{tag, src, dst, count, chunk_id});
 }
 
+// a send's class: 1 from MSG_SPLIT_HIGH_TAG on (MoE decode: combine), else 0 (dispatch)
+int tag_class(const LoomNet::Config& c, int tag) {
+    return c.split_high_tag >= 0 && tag >= c.split_high_tag;
+}
+
+// STAGE_COPY applies to this send: RDMA, a copy rate set, and no measured send loop for its class (which contains the copy)
+bool staged(const LoomNet::Config& c, int tag) {
+    return !c.push && c.stage_gbps > 0 && c.loop_ns[tag_class(c, tag)] <= 0;
+}
+
+// one put of a GPU's send loop at its post time: Loom stores it; RDMA writes its WQE and rings the queue pair if
+// `ring` (DOORBELL_BATCH; a signal always rings)
+void loop_put(int src, int dst, uint64_t b, bool ring, LoomNet::PutCallbacks cb) {
+    LoomNet::Model& m = *g_model;
+    const double t = now_ns(g_eq);
+    if (m.cfg.push) {
+        m.put(src, dst, 0, b, t, std::move(cb));
+        return;
+    }
+    const uint64_t n = m.post_wqe(src, dst, 0, b, false, std::move(cb), t);
+    if (ring) m.ring(src, dst, 0, n, t, true);
+}
+
 // the receiver side of CommonNetworkApi::process_chunk_arrival (the send handler registered there is a no-op;
 // the real sender release is its own event)
 void do_arrival(void* p) {
@@ -86,6 +110,9 @@ void flush(void* p) {
     LoomNet::Model& m = *g_model;
     const double t = now_ns(g_eq);
     const uint64_t split = m.cfg.msg_split;
+    // the puts in posting order: one put of each send in turn, a send's signal right after its last put
+    struct Post { size_t i; uint64_t b; bool sig; };
+    std::vector<Post> seq;
     std::vector<uint64_t> off(v.size(), 0);
     std::vector<bool> done(v.size(), false);
     for (bool more = true; more;) {
@@ -94,27 +121,76 @@ void flush(void* p) {
             if (done[i]) continue;
             auto& s = v[i];
             if (off[i] < s.size) {
-                const uint64_t sp = (m.cfg.split_high_tag >= 0 && s.tag >= m.cfg.split_high_tag) ? m.cfg.split_high : split;
+                const uint64_t sp = tag_class(m.cfg, s.tag) ? m.cfg.split_high : split;
                 const uint64_t b = std::min<uint64_t>(sp ? sp : s.size, s.size - off[i]);
-                m.put(src, s.dst, 0, b, t, LoomNet::PutCallbacks{});
+                if (staged(m.cfg, s.tag) && m.cfg.stage_chunk) {
+                    // STAGE_COPY chunks: the turn's put goes out as consecutive chunks (posting order as without staging;
+                    // chunks of different sends are not interleaved, owner 2026-10-21: whole puts FIFO in both systems)
+                    for (uint64_t o = 0; o < b; o += m.cfg.stage_chunk)
+                        seq.push_back(Post{i, std::min<uint64_t>(m.cfg.stage_chunk, b - o), false});
+                } else {
+                    seq.push_back(Post{i, b, false});
+                }
                 off[i] += b;
             }
             if (off[i] >= s.size) {
-                // the signal, behind the data: the receiver has the message when it sees it; the sender is
-                // released when its stores are out (Loom) or at the signal's CQE (RDMA; SENDER_RELEASE post: now)
-                LoomNet::PutCallbacks cb;
-                const int tag = s.tag, dst = s.dst; const uint64_t size = s.size; const int cid = (int)s.chunk_id;
-                auto h = s.handler; auto a = s.arg;
-                cb.seen = [tag, src, dst, size, cid](double t) { arrival_at(t, tag, src, dst, size, cid); };
-                if (m.cfg.push) cb.out = [src, h, a](double t) { release_at(src, t, h, a); };
-                else if (!m.cfg.release_on_post) cb.cqe = [src, h, a](double t) { release_at(src, t, h, a); };
-                else release_at(src, t, h, a);
-                m.put(src, s.dst, 0, 8, t, cb);
+                seq.push_back(Post{i, 8, true});
                 done[i] = true;
             } else {
                 more = true;
             }
         }
+    }
+    // without a send loop every put is posted now; with one (POST_LOOP_NS) the k-th of a class's N puts at
+    // t + L (first + (last - first) k / (N - 1)), the signals at t + L
+    uint64_t nd[2] = {0, 0}, kd[2] = {0, 0};
+    for (const auto& p : seq)
+        if (!p.sig) nd[tag_class(m.cfg, v[p.i].tag)]++;
+    std::map<int, uint64_t> per_dst;   // puts per destination in this loop (doorbell batching)
+    std::vector<double> last_post(v.size(), t);   // STAGE_COPY: a send's last copied put (its signal follows)
+    for (const auto& p : seq) {
+        const auto& s = v[p.i];
+        const int c = tag_class(m.cfg, s.tag);
+        const double L = m.cfg.loop_ns[c];
+        const bool st = staged(m.cfg, s.tag);
+        double tp = t;
+        bool ring = true;
+        if (st) {
+            if (p.sig) {
+                tp = last_post[p.i];
+            } else {
+                double& busy = stage_busy[src];
+                busy = std::max(busy, t) + (double)p.b / m.cfg.stage_gbps;
+                tp = last_post[p.i] = busy + m.cfg.stage_ns;
+            }
+        } else if (L > 0) {
+            if (p.sig) {
+                tp = t + L;
+            } else {
+                const double f0 = m.cfg.loop_first[c], f1 = m.cfg.loop_last[c];
+                tp = t + L * (f0 + (f1 - f0) * (nd[c] > 1 ? (double)kd[c] / (double)(nd[c] - 1) : 1.0));
+                kd[c]++;
+                const uint64_t q = ++per_dst[s.dst];
+                ring = m.cfg.db_batch && q % m.cfg.db_batch == 0;
+            }
+        }
+        LoomNet::PutCallbacks cb;
+        if (p.sig) {
+            // the signal, behind the data: the receiver has the message when it sees it; the sender is
+            // released when its stores are out (Loom) or at the signal's CQE (RDMA; SENDER_RELEASE post: now)
+            const int tag = s.tag, dst = s.dst; const uint64_t size = s.size; const int cid = (int)s.chunk_id;
+            auto h = s.handler; auto a = s.arg;
+            cb.seen = [tag, src, dst, size, cid](double t) { arrival_at(t, tag, src, dst, size, cid); };
+            if (m.cfg.push) cb.out = [src, h, a](double t) { release_at(src, t, h, a); };
+            else if (!m.cfg.release_on_post) cb.cqe = [src, h, a](double t) { release_at(src, t, h, a); };
+            else release_at(src, tp, h, a);
+        }
+        if (L <= 0 && !st) {
+            m.put(src, s.dst, 0, p.b, t, std::move(cb));
+            continue;
+        }
+        const int dst = s.dst; const uint64_t b = p.b;
+        m.schedule(tp, [src, dst, b, ring, cb]() { loop_put(src, dst, b, ring, cb); });
     }
 }
 }  // namespace
@@ -144,8 +220,9 @@ int LoomNetworkApi::sim_send(void* const, const uint64_t count, const int, const
     auto* e = entry.has_value() ? entry.value() : callback_tracker.create_new_entry(tag, src, dst, count, chunk_id);
     e->register_send_callback(noop, nullptr);
     if (model->same_server(src, dst)) {
+        // NVLink, identical for both systems; with a send loop (POST_LOOP_NS) its signal too waits for the loop's end
         const double t = now_ns(g_eq);
-        const double d = count / model->cfg.nvlink_gbps;
+        const double d = std::max(count / model->cfg.nvlink_gbps, model->cfg.loop_ns[tag_class(model->cfg, tag)]);
         release_at(src, t + d, msg_handler, fun_arg);
         arrival_at(t + d + model->cfg.nvlink_lat_ns, tag, src, dst, count, (int)chunk_id);
         return 0;
