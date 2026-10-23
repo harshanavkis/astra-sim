@@ -1,0 +1,7 @@
+BUILD_START 13:35:37
+copied bf74509 (ns-3 fc5126a64)
+-rwxr-xr-x 1 harshanavkis users 9230592 Oct 21 13:36 ns3.42-AstraSimNetwork-optimized
+-rwxr-xr-x 1 harshanavkis users 1105376 Oct 20 15:49 ns3.42-LoomReplay-optimized
+BUILD_DONE 13:36:19
+ns3 build OK: /scratch/harshanavkis/loom-proj/astra-sim-opt2/extern/network_backend/ns-3/build/scratch/ns3.42-AstraSimNetwork-optimized (md5 a9189c04, p2p lib /scratch/harshanavkis/loom-proj/astra-sim-opt2/extern/network_backend/ns-3/build/lib64/libns3.42-point-to-point-optimized.so, model sources = /scratch/harshanavkis/loom-proj/astra-sim-fresh ns-3 fc5126a64)
+80 jobs

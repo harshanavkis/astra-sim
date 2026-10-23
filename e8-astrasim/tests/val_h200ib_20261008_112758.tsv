@@ -1,0 +1,5 @@
+metric	paper_ns	model_ns
+put+completion inline (fitted)	4030	4018
+put+completion non-inline	4640	4568
+non-inline - inline	610	550
+round trip inline	6850	6028

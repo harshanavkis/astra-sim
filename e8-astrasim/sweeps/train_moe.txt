@@ -1,0 +1,23 @@
+# MoE training sweeps (Opus's DeepSeek-V3-style generator, full depth 61 layers), RDMA vs Loom; tools/sweep_moe_train.sh.
+# name|placement|ep|GPUs|pp|micro-batches|global batch|layers per stage|seq|cluster
+# A. placement and EP at 64 GPUs (Opus defaults: 4 micro-batches, global batch 256, seq 4096 -> 4,096 tokens per GPU)
+moe_mixed_ep8|mixed|8|64|1|4|256|61|4096|n64nm
+moe_mixed_ep16|mixed|16|64|1|4|256|61|4096|n64nm
+moe_mixed_ep32|mixed|32|64|1|4|256|61|4096|n64nm
+moe_mixed_ep64|mixed|64|64|1|4|256|61|4096|n64nm
+moe_scaleout_ep8|scaleout|8|64|1|4|256|61|4096|n64nm
+# B. tokens per GPU per micro-batch (smaller all-to-alls)
+moe_mixed_ep64_tok1k|mixed|64|64|1|1|64|61|1024|n64nm
+moe_mixed_ep64_tok256|mixed|64|64|1|1|64|61|256|n64nm
+moe_mixed_ep64_tok64|mixed|64|64|1|1|64|61|64|n64nm
+moe_scaleout_ep8_tok1k|scaleout|8|64|1|1|64|61|1024|n64nm
+moe_scaleout_ep8_tok256|scaleout|8|64|1|1|64|61|256|n64nm
+moe_scaleout_ep8_tok64|scaleout|8|64|1|1|64|61|64|n64nm
+# C. 256 GPUs (Opus Fig. 14 scale)
+moe256_mixed_ep8|mixed|8|256|1|4|256|61|4096|n256
+moe256_mixed_ep32|mixed|32|256|1|4|256|61|4096|n256
+moe256_mixed_ep64|mixed|64|256|1|4|256|61|4096|n256
+moe256_mixed_ep256|mixed|256|256|1|4|256|61|4096|n256
+moe256_scaleout_ep8|scaleout|8|256|1|4|256|61|4096|n256
+moe256_scaleout_ep32|scaleout|32|256|1|4|256|61|4096|n256
+moe256_mixed_ep256_tok64|mixed|256|256|1|1|256|61|64|n256

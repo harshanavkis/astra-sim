@@ -1,0 +1,8 @@
+op	tokens	msgs	bytes_each	sender_measured_us	sender_model_us	sender_err_pct	delivered_measured_us	delivered_model_us	delivered_err_pct
+combine	1	6	14336	7.62	8.04	+5.5	35.34	14.18	-59.9
+combine	128	683	14336	907.86	915.22	+0.8	924.51	921.36	-0.3
+combine	16	90	14336	110.58	120.60	+9.1	127.52	126.74	-0.6
+dispatch	1	6	7168	4.03	4.02	-0.2	20.84	10.16	-51.3
+dispatch	128	683	7168	449.22	457.61	+1.9	465.46	463.75	-0.4
+dispatch	16	90	7168	52.76	60.30	+14.3	67.14	66.44	-1.0
+# one-way flag: measured 5.10 us (0-token round trip / 2), model 5.10 us (fitted)

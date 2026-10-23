@@ -1,0 +1,8 @@
+# trace steady region: 90781 us, 60 layers, GPU busy 95.7%, comm kernels 17.9%
+regime	variant	compute_ms	comm_ms	step_ms
+A no overlap	deepep_flush	71.79	26.06	97.86
+A no overlap	deepep_ordered	71.79	26.06	97.86
+A no overlap	minimal_ordered	71.79	25.74	97.53
+A no overlap	loom	71.79	25.54	97.34
+B DeepSeek overlap	deepep (measured)	75.76	16.53	92.29
+B DeepSeek overlap	loom (estimate)	75.76	12.98	88.74

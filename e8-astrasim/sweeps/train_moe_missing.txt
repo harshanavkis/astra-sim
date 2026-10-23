@@ -1,0 +1,4 @@
+moe256_mixed_ep64|mixed|64|256|1|4|256|61|4096|n256
+moe256_mixed_ep256|mixed|256|256|1|4|256|61|4096|n256
+moe256_scaleout_ep32|scaleout|32|256|1|4|256|61|4096|n256
+moe256_mixed_ep256_tok64|mixed|256|256|1|1|256|61|64|n256

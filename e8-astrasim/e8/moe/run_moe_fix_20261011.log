@@ -1,0 +1,34 @@
+60 jobs
+done: /scratch/harshanavkis/loom-proj/e8-astrasim/e8/moe/jobs.txt
+op          EP  tok      sender busy (max GPU)       delivered (last GPU)
+                          rdma    loom      x       rdma    loom      x
+dispatch    16    1        8.0     0.6  12.8x        7.1     3.0   2.4x
+dispatch    16   16       18.5     7.4   2.5x       18.0    12.0   1.5x
+dispatch    16  128       84.2    54.6   1.5x       83.8    71.5   1.2x
+dispatch    32    1        8.4     1.0   8.3x        7.5     3.6   2.1x
+dispatch    32   16       27.0    12.4   2.2x       26.5    19.9   1.3x
+dispatch    32  128      124.7    90.9   1.4x      124.2   114.6   1.1x
+dispatch    64    1        9.6     1.0   9.6x        8.1     4.6   1.8x
+dispatch    64   16       31.2    14.4   2.2x       29.9    26.5   1.1x
+dispatch    64  128      153.2   112.2   1.4x      152.0   142.8   1.1x
+dispatch   128    1       10.3     1.0  10.2x        8.9     5.3   1.7x
+dispatch   128   16       37.0    15.7   2.4x       35.5    32.1   1.1x
+dispatch   128  128      169.9   122.0   1.4x      168.6   166.5   1.0x
+dispatch   256    1       10.5     1.0  10.4x        9.0     5.5   1.6x
+dispatch   256   16       40.5    16.1   2.5x       39.0    36.0   1.1x
+dispatch   256  128      191.9   126.2   1.5x      190.6   191.3   1.0x
+combine     16    1        9.2     1.8   5.2x        8.3     3.9   2.1x
+combine     16   16       29.5    16.5   1.8x       29.0    21.6   1.3x
+combine     16  128      146.3   115.8   1.3x      146.0   140.2   1.0x
+combine     32    1        9.9     2.5   3.9x        9.0     4.8   1.9x
+combine     32   16       40.7    26.0   1.6x       40.4    34.2   1.2x
+combine     32  128      231.8   189.3   1.2x      231.5   228.0   1.0x
+combine     64    1       11.1     3.5   3.2x       10.0     6.2   1.6x
+combine     64   16       49.6    33.3   1.5x       48.8    46.5   1.0x
+combine     64  128      285.6   231.8   1.2x      284.7   282.2   1.0x
+combine    128    1       12.2     4.5   2.7x       11.1     7.6   1.5x
+combine    128   16       55.6    35.3   1.6x       54.7    57.2   1.0x
+combine    128  128      313.3   256.4   1.2x      312.2   320.1   1.0x
+combine    256    1       12.7     4.0   3.2x       11.4     7.9   1.4x
+combine    256   16       62.8    39.1   1.6x       61.5    65.7   0.9x
+combine    256  128      351.3   266.5   1.3x      350.3   380.9   0.9x

@@ -1,0 +1,77 @@
+# Dense training sweeps (STAGE, full depth + full vocabulary), RDMA vs Loom on the LoomNet model; tools/sweep_train.sh.
+# name|model|layers|parallelism|batch|micro-batch|seq|extra STAGE args|cluster
+#
+# A. Fig 14's dense groups at full depth (Phase A cut them to 4-8 layers)
+dp|l8|full|dp=8 tp=8 pp=1|256|256|4096||n64nm
+fsdp|l8|full|dp=8 tp=8 pp=1|256|256|4096|--weight_sharded true|n64nm
+pp|l70|full|dp=1 tp=8 pp=8|64|8|4096||n64nm
+cp|l8|full|dp=1 tp=8 sp=8 pp=1|8|8|32768||n64nm
+hybrid|l70|full|dp=2 tp=8 pp=4|64|8|4096||n64nm
+l80|l80|full|dp=4 tp=8 pp=4|256|256|4096||n128nm
+#
+# B. micro-batch size (more, smaller pipeline messages)
+pp_mb1|l70|full|dp=1 tp=8 pp=8|64|1|4096||n64nm
+pp_mb2|l70|full|dp=1 tp=8 pp=8|64|2|4096||n64nm
+pp_mb4|l70|full|dp=1 tp=8 pp=8|64|4|4096||n64nm
+pp_mb16|l70|full|dp=1 tp=8 pp=8|64|16|4096||n64nm
+hybrid_mb1|l70|full|dp=2 tp=8 pp=4|64|1|4096||n64nm
+hybrid_mb2|l70|full|dp=2 tp=8 pp=4|64|2|4096||n64nm
+hybrid_mb4|l70|full|dp=2 tp=8 pp=4|64|4|4096||n64nm
+hybrid_mb16|l70|full|dp=2 tp=8 pp=4|64|16|4096||n64nm
+#
+# C. tensor parallelism across servers (TP > 8 GPUs per server: TP collectives on the scale-out network)
+tp8_mb1|l70|full|dp=8 tp=8 pp=1|64|1|4096||n64nm
+tp16_mb1|l70|full|dp=4 tp=16 pp=1|64|1|4096||n64nm
+tp32_mb1|l70|full|dp=2 tp=32 pp=1|64|1|4096||n64nm
+tp64_mb1|l70|full|dp=1 tp=64 pp=1|64|1|4096||n64nm
+tp8_mb8|l70|full|dp=8 tp=8 pp=1|64|8|4096||n64nm
+tp16_mb8|l70|full|dp=4 tp=16 pp=1|64|8|4096||n64nm
+tp32_mb8|l70|full|dp=2 tp=32 pp=1|64|8|4096||n64nm
+tp64_mb8|l70|full|dp=1 tp=64 pp=1|64|8|4096||n64nm
+tp16_seq1k|l70|full|dp=4 tp=16 pp=1|64|1|1024||n64nm
+tp32_seq1k|l70|full|dp=2 tp=32 pp=1|64|1|1024||n64nm
+#
+# D. sequence length with context parallelism
+cp_s8k|l8|full|dp=1 tp=8 sp=8 pp=1|8|8|8192||n64nm
+cp_s16k|l8|full|dp=1 tp=8 sp=8 pp=1|8|8|16384||n64nm
+cp_s64k|l8|full|dp=1 tp=8 sp=8 pp=1|8|8|65536||n64nm
+cp_s128k|l8|full|dp=1 tp=8 sp=8 pp=1|8|8|131072||n64nm
+cp_s32k_mb1|l8|full|dp=1 tp=8 sp=8 pp=1|8|1|32768||n64nm
+#
+# E. GPU count: weak scaling (32 sequences per replica) and strong scaling (global batch 256) with DP
+dp_w128|l8|full|dp=16 tp=8 pp=1|512|512|4096||n128nm
+dp_w256|l8|full|dp=32 tp=8 pp=1|1024|1024|4096||n256
+dp_w512|l8|full|dp=64 tp=8 pp=1|2048|2048|4096||n512
+dp_s128|l8|full|dp=16 tp=8 pp=1|256|256|4096||n128nm
+dp_s256|l8|full|dp=32 tp=8 pp=1|256|256|4096||n256
+dp_s512|l8|full|dp=64 tp=8 pp=1|256|256|4096||n512
+hybrid_256|l70|full|dp=8 tp=8 pp=4|256|8|4096||n256
+hybrid_512|l70|full|dp=16 tp=8 pp=4|512|8|4096||n512
+#
+# F. global batch with DP (less compute per gradient exchange)
+dp_b64|l8|full|dp=8 tp=8 pp=1|64|64|4096||n64nm
+dp_b128|l8|full|dp=8 tp=8 pp=1|128|128|4096||n64nm
+dp_b512|l8|full|dp=8 tp=8 pp=1|512|512|4096||n64nm
+fsdp_mb32|l8|full|dp=8 tp=8 pp=1|256|32|4096|--weight_sharded true|n64nm
+#
+# G. link rate (PCIe Gen5 <= 400 G, Gen6 at 800 G, Gen7 at 1,600 G, as Fig 13); traces of A / C reused
+dp|l8|full|dp=8 tp=8 pp=1|256|256|4096||n64_l100
+dp|l8|full|dp=8 tp=8 pp=1|256|256|4096||n64_l200
+dp|l8|full|dp=8 tp=8 pp=1|256|256|4096||n64_l800
+dp|l8|full|dp=8 tp=8 pp=1|256|256|4096||n64_l1600
+pp|l70|full|dp=1 tp=8 pp=8|64|8|4096||n64_l100
+pp|l70|full|dp=1 tp=8 pp=8|64|8|4096||n64_l200
+pp|l70|full|dp=1 tp=8 pp=8|64|8|4096||n64_l800
+pp|l70|full|dp=1 tp=8 pp=8|64|8|4096||n64_l1600
+cp|l8|full|dp=1 tp=8 sp=8 pp=1|8|8|32768||n64_l100
+cp|l8|full|dp=1 tp=8 sp=8 pp=1|8|8|32768||n64_l200
+cp|l8|full|dp=1 tp=8 sp=8 pp=1|8|8|32768||n64_l800
+cp|l8|full|dp=1 tp=8 sp=8 pp=1|8|8|32768||n64_l1600
+hybrid|l70|full|dp=2 tp=8 pp=4|64|8|4096||n64_l100
+hybrid|l70|full|dp=2 tp=8 pp=4|64|8|4096||n64_l200
+hybrid|l70|full|dp=2 tp=8 pp=4|64|8|4096||n64_l800
+hybrid|l70|full|dp=2 tp=8 pp=4|64|8|4096||n64_l1600
+tp32_mb1|l70|full|dp=2 tp=32 pp=1|64|1|4096||n64_l100
+tp32_mb1|l70|full|dp=2 tp=32 pp=1|64|1|4096||n64_l200
+tp32_mb1|l70|full|dp=2 tp=32 pp=1|64|1|4096||n64_l800
+tp32_mb1|l70|full|dp=2 tp=32 pp=1|64|1|4096||n64_l1600

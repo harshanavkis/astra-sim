@@ -1,0 +1,5 @@
+library	size	post_us	measured_total_us	model_total_us
+deepep	8	2.53	8.06	7.61
+deepep	7168	2.53	8.48	7.97
+nvshmem	8	6.69	12.90	11.77
+nvshmem	7168	6.75	13.73	12.19

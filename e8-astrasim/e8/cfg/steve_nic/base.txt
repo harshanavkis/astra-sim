@@ -1,0 +1,90 @@
+ENABLE_QCN 1
+USE_DYNAMIC_PFC_THRESHOLD 1
+
+TOPOLOGY_FILE /scratch/harshanavkis/loom-proj/e8-astrasim/e8/topo/steve_cable.txt
+FLOW_FILE /scratch/harshanavkis/loom-proj/e8-astrasim/e8/cfg/flow.txt
+TRACE_FILE /scratch/harshanavkis/loom-proj/e8-astrasim/e8/cfg/steve_nic/trace_nodes.txt
+TRACE_OUTPUT_FILE /dev/null
+FCT_OUTPUT_FILE /dev/null
+PFC_OUTPUT_FILE /dev/null
+QLEN_MON_FILE /dev/null
+QLEN_MON_START 0
+QLEN_MON_END 0
+SIMULATOR_STOP_TIME 40000000000000.00
+
+CC_MODE 12
+ALPHA_RESUME_INTERVAL 1
+RATE_DECREASE_INTERVAL 4
+CLAMP_TARGET_RATE 0
+RP_TIMER 900
+EWMA_GAIN 0.00390625
+FAST_RECOVERY_TIMES 1
+RATE_AI 50Mb/s
+RATE_HAI 100Mb/s
+MIN_RATE 100Mb/s
+DCTCP_RATE_AI 1000Mb/s
+ERROR_RATE_PER_LINK 0.0000
+L2_CHUNK_SIZE 4000
+L2_ACK_INTERVAL 1
+L2_BACK_TO_ZERO 0
+HAS_WIN 0
+GLOBAL_T 0
+VAR_WIN 1
+FAST_REACT 1
+U_TARGET 0.95
+MI_THRESH 0
+INT_MULTI 1
+MULTI_RATE 0
+SAMPLE_FEEDBACK 0
+PINT_LOG_BASE 1.05
+PINT_PROB 1.0
+NIC_TOTAL_PAUSE_TIME 0
+RATE_BOUND 1
+ACK_HIGH_PRIO 0
+LINK_DOWN 0 0 0
+ENABLE_TRACE 0
+KMAX_MAP 6 25000000000 400 40000000000 800 100000000000 1600 200000000000 2400 400000000000 3200 2400000000000 3200
+KMIN_MAP 6 25000000000 100 40000000000 200 100000000000 400 200000000000 600 400000000000 800 2400000000000 800
+PMAX_MAP 6 25000000000 0.2 40000000000 0.2 100000000000 0.2 200000000000 0.2 400000000000 0.2 2400000000000 0.2
+BUFFER_SIZE 32
+
+# steve: H200 + CX-7, port0 -> port1 cable (no switch), 200G, RoCE MTU 4096 (netdev 9000 since
+# 2026-10-09 22:16); both ports are one NIC on one PCIe link, the GPU on another (Gen5 x16 each)
+PACKET_PAYLOAD_SIZE 4096
+WIRE_BYTES_PER_PACKET 82
+NODE_HOST 1 0
+
+# GPU-initiated RDMA (DeepEP / NVSHMEM IBGDA): SQ, send and receive buffers, CQ in GPU memory;
+# the GPU rings 8 B doorbells (no BlueFlame), the NIC fetches WQEs and reads payloads (MRRS 4096)
+HOST_IF_MODE nic
+NIC_POSTER gpu
+NIC_SQ_MEM gpu
+NIC_BUF_MEM gpu
+NIC_CQ_MEM gpu
+NIC_RX_MEM gpu
+NIC_BF 0
+INLINE_MAX 0
+PCIE_MRRS 4096
+WQE_BYTES 64
+WQE_FETCH_MAX 64
+
+# PCIe and NIC latencies, all from single-message measurements on steve (no dispatch data):
+#   read latencies: nic_post (MTU 4096, 2026-10-09 22:20): host - inline 0.66/0.68, doorbell-only -
+#     BlueFlame 0.69/0.71/0.68 -> host 670; GPU - host 0.69/0.66 -> GPU 1350
+#   NIC_RX_NS: nic_post inline BlueFlame post->CQE 2.02 - one-way 8 B host write 1.42 (perftest
+#     T1; 8 B is one packet at any MTU) - ACK wire 0.01 = 590
+#   host one-way (doorbell, write visible to the CPU) 280 each (host read 670 = 2 x 280 + DRAM 110),
+#   NIC_TX_NS: 1.42 - 590 - 2 x 280 - wire 10 = 260
+#   GPU doorbell + NIC write visible to a polling SM: DeepEP single put (MTU 4096, 22:18) post->CQE
+#     8.0 - 2.55 = 5.45 - 2 x 1350 (WQE, payload) - 260 - 2 x 590 - wire 20 = 1290, split evenly
+PCIE_LINK_GBPS 57.6
+PCIE_RD_HOST_NS 670
+PCIE_RD_GPU_NS 1350
+PCIE_DB_HOST_NS 280
+PCIE_WR_HOST_NS 280
+PCIE_DB_GPU_NS 645
+PCIE_WR_GPU_NS 645
+NIC_TX_NS 260
+NIC_RX_NS 590
+RX_POLL_NS 0
+CQE_POLL_NS 0

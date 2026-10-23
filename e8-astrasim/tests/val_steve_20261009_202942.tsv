@@ -1,0 +1,16 @@
+check	measured_us	model_us
+fit: CPU inline BlueFlame put -> CQE	2.02	2.05
+DeepEP put 8 B, post -> completion	7.97	8.02
+DeepEP put 7168 B, post -> completion	8.42	8.54
+dispatch ordered 6 msgs (7168 B)	13.3	9.76
+dispatch flush 6 msgs (7168 B)	24.8	17.22
+dispatch ordered 90 msgs (7168 B)	36.2	33.48
+dispatch flush 90 msgs (7168 B)	43.0	41.49
+dispatch ordered 683 msgs (7168 B)	211.8	204.85
+dispatch flush 683 msgs (7168 B)	218.9	212.87
+combine ordered 6 msgs (14336 B)	15.1	10.94
+combine flush 6 msgs (14336 B)	26.1	18.95
+combine ordered 90 msgs (14336 B)	62.0	59.49
+combine flush 90 msgs (14336 B)	72.0	67.50
+combine ordered 683 msgs (14336 B)	413.0	402.24
+combine flush 683 msgs (14336 B)	434.6	410.26

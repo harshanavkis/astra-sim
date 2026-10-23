@@ -1,0 +1,94 @@
+# E4 testbed (amy V80 -> amy U280 Loom -> 100G -> N8550 switch -> rose U280 Loom -> rose V80 HBM), Loom push,
+# for tests/run_val_e4.sh. Derived from steve_nic/push_250mhz.txt (Loom 21/7 cycles at 250 MHz = NIC_TX/RX 84/28).
+# Inputs, all independent of the dispatch runs:
+#   PCIE_LINK_GBPS 10.7: E1 Loom program puts (ce_remote --prog, 2026-10-07: 10.68-10.80 GB/s into the remote
+#     host, 10.37-10.98 into the remote V80, from 4 KiB up) - the testbed's sustained Loom store rate, used for
+#     the V80 -> U280 stores and the U280 -> V80 receive writes (choice: one rate for both)
+#   one fixed latency: the 0-token E4 flag round trip / 2 = 5.10 us, put entirely into the two link delays
+#     (written by tests/run_val_e4.sh into the topology); PCIe one-way latencies 0 for that reason
+#   WQE_BYTES 0: a Loom store carries no work request
+ENABLE_QCN 1
+USE_DYNAMIC_PFC_THRESHOLD 1
+
+FLOW_FILE /scratch/harshanavkis/loom-proj/e8-astrasim/e8/cfg/flow.txt
+TRACE_FILE /scratch/harshanavkis/loom-proj/e8-astrasim/e8/cfg/steve_nic/trace_nodes.txt
+TRACE_OUTPUT_FILE /dev/null
+FCT_OUTPUT_FILE /dev/null
+PFC_OUTPUT_FILE /dev/null
+QLEN_MON_FILE /dev/null
+QLEN_MON_START 0
+QLEN_MON_END 0
+SIMULATOR_STOP_TIME 40000000000000.00
+
+CC_MODE 12
+ALPHA_RESUME_INTERVAL 1
+RATE_DECREASE_INTERVAL 4
+CLAMP_TARGET_RATE 0
+RP_TIMER 900
+EWMA_GAIN 0.00390625
+FAST_RECOVERY_TIMES 1
+RATE_AI 50Mb/s
+RATE_HAI 100Mb/s
+MIN_RATE 100Mb/s
+DCTCP_RATE_AI 1000Mb/s
+ERROR_RATE_PER_LINK 0.0000
+L2_CHUNK_SIZE 4000
+L2_ACK_INTERVAL 1
+L2_BACK_TO_ZERO 0
+HAS_WIN 0
+GLOBAL_T 0
+VAR_WIN 1
+FAST_REACT 1
+U_TARGET 0.95
+MI_THRESH 0
+INT_MULTI 1
+MULTI_RATE 0
+SAMPLE_FEEDBACK 0
+PINT_LOG_BASE 1.05
+PINT_PROB 1.0
+NIC_TOTAL_PAUSE_TIME 0
+RATE_BOUND 1
+ACK_HIGH_PRIO 0
+LINK_DOWN 0 0 0
+ENABLE_TRACE 0
+KMAX_MAP 6 25000000000 400 40000000000 800 100000000000 1600 200000000000 2400 400000000000 3200 2400000000000 3200
+KMIN_MAP 6 25000000000 100 40000000000 200 100000000000 400 200000000000 600 400000000000 800 2400000000000 800
+PMAX_MAP 6 25000000000 0.2 40000000000 0.2 100000000000 0.2 200000000000 0.2 400000000000 0.2 2400000000000 0.2
+BUFFER_SIZE 32
+
+# steve: H200 + CX-7, port0 -> port1 cable (no switch), 200G, RoCE MTU 4096 (netdev 9000 since
+# 2026-10-09 22:16); both ports are one NIC on one PCIe link, the GPU on another (Gen5 x16 each)
+PACKET_PAYLOAD_SIZE 4096
+WIRE_BYTES_PER_PACKET 82
+
+# GPU-initiated RDMA (DeepEP / NVSHMEM IBGDA): SQ, send and receive buffers, CQ in GPU memory;
+HOST_IF_MODE nic
+NIC_POSTER gpu
+NIC_SQ_MEM gpu
+NIC_BUF_MEM gpu
+NIC_CQ_MEM gpu
+NIC_RX_MEM gpu
+NIC_BF 0
+INLINE_MAX 0
+PCIE_MRRS 4096
+WQE_FETCH_MAX 64
+
+PCIE_RD_HOST_NS 670
+PCIE_RD_GPU_NS 1350
+PCIE_DB_HOST_NS 280
+PCIE_WR_HOST_NS 280
+NIC_TX_NS 260
+NIC_RX_NS 590
+RX_POLL_NS 0
+CQE_POLL_NS 0
+
+NIC_BF 1
+INLINE_MAX 1000000000
+NIC_TX_NS 84
+NIC_RX_NS 28
+NIC_PUSH 1
+TOPOLOGY_FILE /scratch/harshanavkis/loom-proj/e8-astrasim/e8/cfg/testbed_e4/topo.txt
+PCIE_LINK_GBPS 10.7
+PCIE_DB_GPU_NS 0
+PCIE_WR_GPU_NS 0
+WQE_BYTES 0

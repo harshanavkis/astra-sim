@@ -1,0 +1,1 @@
+dpfull|l8|full|dp=8 tp=8 pp=1|256|256|4096||n64nm

@@ -1,0 +1,31 @@
+system	bar	stage	category	start_ns	end_ns	source
+rdma	receiver	GPU copies into its registered buffer	GPU	0	350	copy: 350 ns measured + 64 B at the H200 spec
+rdma	receiver	GPU posts	GPU	350	2910	DeepEP's post call (measured)
+rdma	receiver	doorbell	PCIe write	2910	3555	PCIe write, measured
+rdma	receiver	NIC fetches request	NIC read	3555	4906	PCIe read, measured
+rdma	receiver	NIC fetches signal's request	NIC read	4906	6258	PCIe read, measured
+rdma	receiver	NIC reads signal's payload	NIC read	6258	7609	PCIe read, measured
+rdma	receiver	network stack (send)	network stack	7609	7869	NIC pipeline, measured
+rdma	receiver	wire and switch	wire	7869	8182	links + switch, model
+rdma	receiver	network stack (receive)	network stack	8182	8772	NIC pipeline, measured
+rdma	receiver	write visible	PCIe write	8772	9417	PCIe write, measured
+rdma	sender	GPU copies into its registered buffer	GPU	0	350	copy: 350 ns measured + 64 B at the H200 spec
+rdma	sender	GPU posts	GPU	350	2910	DeepEP's post call (measured)
+rdma	sender	doorbell	PCIe write	2910	3555	PCIe write, measured
+rdma	sender	NIC fetches request	NIC read	3555	4906	PCIe read, measured
+rdma	sender	NIC fetches signal's request	NIC read	4906	6258	PCIe read, measured
+rdma	sender	NIC reads signal's payload	NIC read	6258	7609	PCIe read, measured
+rdma	sender	network stack (send)	network stack	7609	7869	NIC pipeline, measured
+rdma	sender	wire and switch	wire	7869	8182	links + switch, model
+rdma	sender	network stack (receive)	network stack	8182	8772	NIC pipeline, measured
+rdma	sender	acknowledgement on the wire	wire	8772	9085	links + switch, model
+rdma	sender	completion written	PCIe write	9085	9732	PCIe write, measured
+loom	receiver	GPU stores	GPU	0	710	stores + release signal, one warp (measured)
+loom	receiver	stores reach the switch	PCIe write	710	1356	PCIe write, measured
+loom	receiver	Loom pipeline (send)	Loom pipeline	1356	1377	RTL cycles
+loom	receiver	network stack (send)	network stack	1377	1640	NIC pipeline, measured
+loom	receiver	wire and switch	wire	1640	1955	links + switch, model
+loom	receiver	network stack (receive)	network stack	1955	2545	NIC pipeline, measured
+loom	receiver	Loom pipeline (receive)	Loom pipeline	2545	2552	RTL cycles
+loom	receiver	write visible	PCIe write	2552	3197	PCIe write, measured
+loom	sender	GPU stores	GPU	0	711	stores + release signal, one warp (measured); stores out of the GPU

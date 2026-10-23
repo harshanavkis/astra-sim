@@ -1,0 +1,44 @@
+80 jobs
+done: /scratch/harshanavkis/loom-proj/e8-astrasim/e8/coll/jobs.txt
+op           GPUs     bytes        rdma     loom      x
+ALL_GATHER     16      1024        50.8     31.3  1.62x
+ALL_GATHER     16     16384        51.9     32.8  1.58x
+ALL_GATHER     16    262144        99.5     82.6  1.20x
+ALL_GATHER     16   4194304      1295.8   1292.2  1.00x
+ALL_GATHER     16  67108864     20649.4  20645.8  1.00x
+ALL_GATHER     64      1024       211.1    133.3  1.58x
+ALL_GATHER     64     16384       214.0    139.7  1.53x
+ALL_GATHER     64    262144       402.2    341.8  1.18x
+ALL_GATHER     64   4194304      5425.7   5422.2  1.00x
+ALL_GATHER     64  67108864     86710.8  86707.3  1.00x
+ALL_REDUCE     16      1024       101.5     62.4  1.63x
+ALL_REDUCE     16     16384       101.5     62.6  1.62x
+ALL_REDUCE     16    262144       103.2     65.6  1.57x
+ALL_REDUCE     16   4194304       193.7    163.4  1.19x
+ALL_REDUCE     16  67108864      2586.1   2582.6  1.00x
+ALL_REDUCE     64      1024       422.0    265.9  1.59x
+ALL_REDUCE     64     16384       422.0    266.0  1.59x
+ALL_REDUCE     64    262144       423.1    269.1  1.57x
+ALL_REDUCE     64   4194304       462.8    295.7  1.57x
+ALL_REDUCE     64  67108864      2717.7   2713.2  1.00x
+ALL_TO_ALL     16      1024        13.1      3.4  3.85x
+ALL_TO_ALL     16     16384        13.2      3.6  3.69x
+ALL_TO_ALL     16    262144        14.8      6.4  2.31x
+ALL_TO_ALL     16   4194304        58.3     53.4  1.09x
+ALL_TO_ALL     16  67108864       711.4    824.7  0.86x
+ALL_TO_ALL     64      1024        14.8      5.3  2.82x
+ALL_TO_ALL     64     16384        15.0      5.5  2.75x
+ALL_TO_ALL     64    262144        17.6      9.6  1.83x
+ALL_TO_ALL     64   4194304        85.0     81.7  1.04x
+ALL_TO_ALL     64  67108864      1235.2   1253.4  0.99x
+REDUCE_SCATTER   16      1024        50.7     31.2  1.62x
+REDUCE_SCATTER   16     16384        50.8     31.3  1.62x
+REDUCE_SCATTER   16    262144        51.9     32.9  1.58x
+REDUCE_SCATTER   16   4194304       100.0     82.7  1.21x
+REDUCE_SCATTER   16  67108864      1296.7   1293.2  1.00x
+REDUCE_SCATTER   64      1024       211.0    133.0  1.59x
+REDUCE_SCATTER   64     16384       211.0    133.0  1.59x
+REDUCE_SCATTER   64    262144       211.6    134.6  1.57x
+REDUCE_SCATTER   64   4194304       236.3    148.8  1.59x
+REDUCE_SCATTER   64  67108864      1362.7   1358.1  1.00x
+COLL_DONE
