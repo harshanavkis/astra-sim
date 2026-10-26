@@ -1,0 +1,49 @@
+# RDMA work-request fetch limit (WQE_FETCH_MAX) vs the paper's Fig 10 (b, c) model results, 2026-10-26 (MODEL).
+# Binary c20d3f62 / model e1c1d32e (as the paper's runs); limit 64 reproduces e8_an/loop/moe.tsv and coll/coll.tsv exactly.
+# Loom has no work requests: its results are identical for every limit.
+
+MoE, 256 GPUs, RDMA, us: sender free / last receiver has all tokens
+op         tok           lim 1           lim 8          lim 16          lim 64         lim 256        lim none
+dispatch     1       15.4/14.5       15.4/14.5       15.4/14.5       15.4/14.5       15.4/14.5       15.4/14.5
+dispatch     4       20.5/19.6       20.3/19.5       20.3/19.5       20.3/19.5       20.3/19.5       20.3/19.5
+dispatch    16       45.9/45.0       45.9/45.0       45.9/45.0       45.9/45.0       45.9/45.0       45.9/45.0
+dispatch    64     126.8/125.9     126.9/126.0     126.9/126.0     126.9/126.0     126.9/126.0     126.9/126.0
+dispatch   128     206.4/205.6     206.6/205.7     206.6/205.7     206.6/205.7     206.6/205.7     206.6/205.7
+combine      1       16.2/15.3       16.2/15.3       16.2/15.3       16.2/15.3       16.2/15.3       16.2/15.3
+combine      4       20.1/19.2       20.1/19.2       20.1/19.2       20.1/19.2       20.1/19.2       20.1/19.2
+combine     16       78.0/77.2       78.0/77.2       78.0/77.2       78.0/77.2       78.0/77.2       78.0/77.2
+combine     64     147.7/146.8     147.7/146.8     147.7/146.8     147.7/146.8     147.7/146.8     147.7/146.8
+combine    128     403.4/402.5     403.4/402.5     403.4/402.5     403.4/402.5     403.4/402.5     403.4/402.5
+
+Collectives, 64 GPUs, RDMA, us
+op                  bytes     lim 1     lim 8    lim 16    lim 64   lim 256  lim none
+ALL_GATHER           1024     686.9     216.7     216.7     216.7     216.7     216.7
+ALL_GATHER          16384     703.7     219.7     219.7     219.7     219.7     219.7
+ALL_GATHER         262144     972.5     383.4     383.7     383.7     383.7     383.7
+ALL_GATHER        4194304    5614.9    5397.8    5397.8    5397.8    5397.8    5397.8
+ALL_GATHER       67108864   86257.2   86257.2   86257.2   86257.2   86257.2   86257.2
+ALL_TO_ALL           1024      17.9      15.6      15.6      15.6      15.6      15.6
+ALL_TO_ALL          16384      17.9      15.8      15.8      15.8      15.8      15.8
+ALL_TO_ALL         262144      19.4      18.3      18.3      18.3      18.3      18.3
+ALL_TO_ALL        4194304      85.1      85.1      85.1      85.1      85.1      85.1
+ALL_TO_ALL       67108864    1258.4    1258.4    1258.4    1258.4    1258.4    1258.4
+REDUCE_SCATTER       1024     685.8     216.6     216.6     216.6     216.6     216.6
+REDUCE_SCATTER      16384     686.1     216.7     216.7     216.7     216.7     216.7
+REDUCE_SCATTER     262144     690.3     217.2     217.2     217.2     217.2     217.2
+REDUCE_SCATTER    4194304     757.5     245.2     244.4     244.4     244.4     244.4
+REDUCE_SCATTER   67108864    1833.0    1356.1    1356.1    1356.1    1356.1    1356.1
+ALL_REDUCE           1024    1366.8     433.2     433.2     433.2     433.2     433.2
+ALL_REDUCE          16384    1367.3     433.3     433.3     433.3     433.3     433.3
+ALL_REDUCE         262144    1375.7     434.4     434.4     434.4     434.4     434.4
+ALL_REDUCE        4194304    1510.1     487.6     484.1     484.1     484.1     484.1
+ALL_REDUCE       67108864    3660.7    2704.0    2704.0    2704.0    2704.0    2704.0
+
+limit 1      max change vs 64: MoE (256 GPUs) 0.69%, collectives (64 GPUs) 220.38%
+limit 8      max change vs 64: MoE (256 GPUs) 0.00%, collectives (64 GPUs) 0.73%
+limit 16     max change vs 64: MoE (256 GPUs) 0.00%, collectives (64 GPUs) 0.00%
+limit 64     max change vs 64: MoE (256 GPUs) 0.00%, collectives (64 GPUs) 0.00%
+limit 256    max change vs 64: MoE (256 GPUs) 0.00%, collectives (64 GPUs) 0.00%
+limit none   max change vs 64: MoE (256 GPUs) 0.00%, collectives (64 GPUs) 0.00%
+
+Also at no limit (2026-10-26, ~/loom-experiments/val_model): validation runs_an/20261026_nolimit == 20261025_2231_fid;
+Fig 11 sweep sweep_an/20261026_nolimit == 20261022_gpuw except the unplotted RDMA "stream" points. Not rerun: Fig 10 (a, d).

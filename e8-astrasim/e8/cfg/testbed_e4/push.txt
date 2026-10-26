@@ -71,7 +71,8 @@ NIC_RX_MEM gpu
 NIC_BF 0
 INLINE_MAX 0
 PCIE_MRRS 4096
-WQE_FETCH_MAX 64
+# no limit on WQEs per fetch (owner 2026-10-26; was 64; results identical from 16 up: e8_an/wqf/RESULTS.txt)
+WQE_FETCH_MAX 1000000000
 
 PCIE_RD_HOST_NS 670
 PCIE_RD_GPU_NS 1350

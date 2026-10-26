@@ -66,7 +66,8 @@ NIC_BF 0
 INLINE_MAX 0
 PCIE_MRRS 4096
 WQE_BYTES 64
-WQE_FETCH_MAX 64
+# no limit on WQEs per fetch (owner 2026-10-26; was 64; results identical from 16 up: e8_an/wqf/RESULTS.txt)
+WQE_FETCH_MAX 1000000000
 
 # PCIe and NIC latencies, all from single-message measurements on steve (no dispatch data):
 #   read latencies: nic_post (MTU 4096, 2026-10-09 22:20): host - inline 0.66/0.68, doorbell-only -

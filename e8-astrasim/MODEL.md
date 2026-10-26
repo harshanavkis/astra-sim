@@ -43,7 +43,8 @@ Every number says whether it is **measured** (hardware), **model** (simulator ou
 Mechanism (ns-3 rdma-hw.cc "nic mode", pcie-fabric.{h,cc}):
 - Persistent QPs, one per GPU pair. The GPU writes WQEs into the send queue and rings a doorbell
   per put (8 B MMIO write over PCIe).
-- The NIC fetches the WQEs it was rung for (one fetch per QP at a time, up to 64 WQEs per read),
+- The NIC fetches the WQEs it was rung for (one fetch per QP at a time, all rung WQEs per read: no limit since
+  2026-10-26, WQE_FETCH_MAX 1e9 in every config; was 64, an unsourced default; e8_an/wqf/RESULTS.txt: identical from 16 up),
   then reads each payload from GPU memory in MRRS pieces, round robin over its QPs, with a bounded
   number of read bytes outstanding. A packet leaves once its bytes are in the NIC and never crosses
   a WQE's end.
@@ -89,7 +90,7 @@ e8/cfg/steve_nic/base.txt; none is fitted to the dispatch/combine runs used for 
 | host one-way (doorbell / write) | 280 ns | measured |
 | GPU doorbell + NIC write visible to a polling SM | 645 + 645 ns | split of 1290 ns; DeepEP single put 5.45 us, measured |
 | PCIe payload rate per direction | 57.6 GB/s | Gen5 x16 x 256/280 (computed) |
-| WQE size, WQEs per fetch, PCIe max read request | 64 B, 64, 4096 B | model settings |
+| WQE size, WQEs per fetch, PCIe max read request | 64 B, no limit (was 64 until 2026-10-26), 4096 B | model settings |
 | Loom pipeline | 21 / 7 cycles | Loom RTL |
 | switch + cable per hop | ~300 ns | owner-approved cluster |
 
