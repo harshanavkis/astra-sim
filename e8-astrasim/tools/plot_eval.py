@@ -292,6 +292,19 @@ E2_LAT = {   # one-way latency samples (ns), 4,000 per size, one-way = round tri
     'loom_cpu': (RL + '/e2_loom_cpu_{s}.oneway_ns.txt', 'loom: cpu stores'),
     'rdma_chunk': (RR + '/e2_rdma_chunk64_sq32_{s}.oneway_ns.txt', 'rdma: 64 B writes, 32-deep queue'),
 }
+# 2026-10-25 (owner: every experiment on the new image pair, loom-switch-stamp / perf_rdma-stamp-noila, with the flag in the
+# last 8 B of the data; RDMA staged next to registered): FIG9_DIR = a run_fig9stage_20261025.sh session (absolute path);
+# unset = the 2026-10-19 data above. Adds the staged RDMA series (h_rdma1_stg, h_rdma64_stg; E1 'rdma_stg').
+FIG9 = os.environ.get('FIG9_DIR')
+if FIG9:
+    E2_LAT.update({
+        'h_stores': (FIG9 + '/e2_stores_{s}.oneway_ns.txt', 'Loom: CPU stores'),
+        'h_ptdma': (FIG9 + '/e2_ptdma_{s}.oneway_ns.txt', 'Loom: PTDMA'),
+        'h_rdma64': (FIG9 + '/e2_rdma_chunk64_reg_{s}.oneway_ns.txt', 'RDMA: 64 B writes'),
+        'h_rdma1': (FIG9 + '/e2_rdma_bulk_reg_{s}.oneway_ns.txt', 'RDMA: one write'),
+        'h_rdma64_stg': (FIG9 + '/e2_rdma_chunk64_stg_{s}.oneway_ns.txt', 'RDMA: 64 B writes, staged by the CPU'),
+        'h_rdma1_stg': (FIG9 + '/e2_rdma_bulk_stg_{s}.oneway_ns.txt', 'RDMA: one write, staged by the CPU'),
+    })
 E2_SIZES = (0, 64, 256, 1024, 4096, 16384, 65536)
 
 
@@ -334,9 +347,15 @@ def e1_series_h():
         return (med, v[k - 1], v[n - k]) if k else (med, med, med)
     sizes = (4096, 8192, 16384, 65536, 262144, 1048576, 4194304, 16777216, 67108864)
     out = {'loom': [], 'rdma': []}
+    D1 = FIG9 or H   # FIG9_DIR: the 2026-10-25 session, RDMA registered (e1_rdma_reg_) and staged (e1_rdma_stg_)
+    series = [('loom', f'{D1}/e1_loom_{{s}}{{suf}}.client.log', r'ack back \S+ us after the first start \((\S+) GB/s'),
+              ('rdma', f'{D1}/e1_rdma_{"reg_" if FIG9 else ""}{{s}}{{suf}}.client.log', r'^ok +run (?:[1-9]\d*): .* = (\S+) GB/s')]
+    if FIG9:
+        out['rdma_stg'] = []
+        series.append(('rdma_stg', f'{D1}/e1_rdma_stg_{{s}}{{suf}}.client.log', r'^ok +run (?:[1-9]\d*): .* = (\S+) GB/s'))
     for s in sizes:
-        for key, pat, rx in (('loom', f'{H}/e1_loom_{s}{{}}.client.log', r'ack back \S+ us after the first start \((\S+) GB/s'),
-                             ('rdma', f'{H}/e1_rdma_{s}{{}}.client.log', r'^ok +run (?:[1-9]\d*): .* = (\S+) GB/s')):
+        for key, pat0, rx in series:
+            pat = pat0.replace('{s}', str(s)).replace('{suf}', '{}')
             v = []
             for suf in ('', '_retry', '_try2', '_try3'):
                 f = os.path.join(X, pat.format(suf))

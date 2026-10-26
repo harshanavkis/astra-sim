@@ -27,8 +27,18 @@ SWEEP_TSV = os.environ.get('SWEEP_TSV', os.path.join(pe.X, pe.SWEEP))
 STAGES_TSV = os.environ.get('STAGES_TSV', os.path.join(E, 'e8_an/loop/stages.tsv'))
 COLL_TSV = os.environ.get('COLL_TSV', os.path.join(E, 'e8_an/loop/coll/coll.tsv' if LOOP else 'e8_an/coll/coll.tsv'))
 E2E_TSV = os.environ.get('E2E_TSV', os.path.join(E, 'e8_an/e2e/e2e_full.tsv'))
-W, HGT = 7.0, 1.62                      # inches: ACM text width; one row of panels + the legend row above
+W, HGT = 7.0, 1.37                      # inches: ACM text width; one row of panels + the legend row above
+# 2026-10-26 (owner: "all plots are too tall in the evaluation ... shorter but consistent everywhere"): HGT 1.62 -> 1.37,
+# every panel 0.67 in high (was 0.92; PANEL_H, also used by plot_coll_ratio.py's two rows)
+PANEL_H = HGT - 0.70
 FONT = dict(tick=6.5, label=7.0, title=7.0, legend=7.0, note=6.0)
+# 2026-10-26 (owner: "plot text same or smaller than the caption font, at least as rendered"): the paper's own font, Linux
+# Libertine (fonts/, copied from the TeX tree), so 7 pt in a plot looks like the 7 pt caption (DejaVu Sans 7 pt rendered ~25%
+# larger: bigger x-height)
+from matplotlib import font_manager as _fm
+for _f in ('LinLibertine_R.ttf', 'LinLibertine_RB.ttf', 'LinLibertine_RI.ttf'):   # TrueType (fonts/otf2ttf.py): Type 42 needs glyf outlines
+    _fm.fontManager.addfont(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts', _f))
+plt.rcParams.update({'font.family': 'Linux Libertine O', 'mathtext.fontset': 'custom', 'mathtext.rm': 'Linux Libertine O'})
 plt.rcParams.update({'font.size': FONT['tick'], 'axes.linewidth': 0.6, 'xtick.major.width': 0.5, 'ytick.major.width': 0.5,
                      'xtick.major.size': 2.0, 'ytick.major.size': 2.0, 'xtick.major.pad': 1.5, 'ytick.major.pad': 1.5,
                      'axes.labelpad': 1.5, 'grid.linewidth': 0.4, 'hatch.linewidth': 0.5, 'legend.handlelength': 1.8,
@@ -40,8 +50,8 @@ UP, DOWN = '(higher is better ↑)', '(lower is better ↓)'   # owner 2026-10-2
 TITLE_H = 0.12                          # inches: the direction's second title line
 
 
-def strip(n, legend_rows=2, ratios=None, bottom=0.47):
-    h = HGT + 0.07 + 0.13 * (legend_rows - 1) + TITLE_H
+def strip(n, legend_rows=2, ratios=None, bottom=0.47, extra=0.0):
+    h = HGT + 0.07 + 0.13 * (legend_rows - 1) + TITLE_H + extra   # extra: taller panels (2026-10-25, Fig 9 with 5 bars in (b))
     fig, axes = plt.subplots(1, n, figsize=(W, h), gridspec_kw={'width_ratios': ratios} if ratios else None)
     fig.subplots_adjust(left=0.062, right=0.995, top=1 - (0.30 + 0.13 * (legend_rows - 1) + TITLE_H) / h,
                         bottom=bottom / h, wspace=0.42)
@@ -89,11 +99,64 @@ COLLS = (('ag', 'all-gather', 'tab:orange', 's'), ('a2a', 'all-to-all', 'tab:cya
          ('rs', 'reduce-scatter', 'tab:olive', 'v'), ('ar_ring', 'all-reduce', 'tab:purple', 'o'))
 
 
-def strip_a(out):
+# Fig 9 (d) reads (owner 2026-10-25: latency, breakdown, throughput, READS; the collectives move to their own figure; plot
+# the existing data, optimize later). MEASURED, ~/loom-experiments/e2/20261025_1101_reads (run_reads_20261025.sh, standard
+# images, 3 runs, median of the runs' medians): amy reads rose's host memory. Loom: get_bench CPU loads (32 B streaming
+# loads; 8 B = one 8 B load) and the PTDMA engine reading the window (--ptq); RDMA: rdma_pingpong --read --size S (one READ,
+# the client polls the last word).
+READS_DIR = os.environ.get('READS_DIR', '/home/harshanavkis/loom-experiments/e2/20261025_1101_reads')
+READS_SIZES = (8, 256, 4096, 65536, 1048576, 16777216)
+# 2026-10-26 (owner: "show the two ceilings: normal rdma and the 256B per rdma read rdma"; Loom's window reads reach the
+# switch as 256 B pieces): RDMA with one READ per 256 B, posted back to back (rdma_pingpong --read --chunk 256), MEASURED,
+# ~/loom-experiments/e2/<time>_rdchunk (run_rdchunk_20261026.sh, interleaved with the normal READ, 3 runs, median of medians)
+READS256_DIR = os.environ.get('READS256_DIR', '')
+NORA = dict(color=LOOM, marker='D', markerfacecolor='#c7e9c0', linestyle='-.')   # Loom's DMA engine without read-ahead
+
+
+def reads_data():
+    """{'loads' | 'ptdma' | 'rdma': {size: us}}, the median over the runs"""
+    import glob, re, statistics
+    runs = {'loads': {}, 'ptdma': {}, 'rdma': {}, 'rdma256': {}, 'ptdma_nora': {}}
+    # 2026-10-26 (owner: Loom with and without read-ahead): loom_getnora_run* = get_bench --ra-off on the same image,
+    # interleaved with the loom_get_run* runs; only its DMA-engine reads are plotted
+    for f in sorted(glob.glob(os.path.join(READS_DIR, 'loom_getnora_run*.client.log'))):
+        sec = None
+        for l in open(f, errors='replace'):
+            if l.startswith('dma'): sec = 'ptdma_nora'
+            elif l.startswith('parallel'): sec = None
+            m = re.match(r'\s+ok\s+(\d+) B: median\s+([\d.]+) us', l)
+            if sec and m:
+                runs[sec].setdefault(int(m.group(1)), []).append(float(m.group(2)))
+    for f in sorted(glob.glob(os.path.join(READS_DIR, 'loom_get_run*.client.log'))):
+        sec = None
+        for l in open(f, errors='replace'):
+            if l.startswith('latency'): sec = 'lat'
+            elif l.startswith('bulk'): sec = 'loads'
+            elif l.startswith('dma'): sec = 'ptdma'
+            elif l.startswith('parallel'): sec = None
+            m = re.match(r'\s+ok\s+8 B load: median\s+([\d.]+) us', l)
+            if sec == 'lat' and m:
+                runs['loads'].setdefault(8, []).append(float(m.group(1)))
+            m = re.match(r'\s+ok\s+(\d+) B: median\s+([\d.]+) us', l)
+            if sec in ('loads', 'ptdma') and m:
+                runs[sec].setdefault(int(m.group(1)), []).append(float(m.group(2)))
+    for f in glob.glob(os.path.join(READS_DIR, 'rdma_read_*_run*.client.log')):
+        m = re.search(r'read (\d+) B round trip \(ns.*?p50 (\d+)', open(f, errors='replace').read())
+        if m:
+            runs['rdma'].setdefault(int(m.group(1)), []).append(float(m.group(2)) / 1e3)
+    for f in glob.glob(os.path.join(READS256_DIR, 'rdma_chunk256_*_run*.client.log')) if READS256_DIR else ():
+        m = re.search(r'read (\d+) B in 256 B READs round trip \(ns.*?p50 (\d+)', open(f, errors='replace').read())
+        if m:
+            runs['rdma256'].setdefault(int(m.group(1)), []).append(float(m.group(2)) / 1e3)
+    return {k: {s: statistics.median(v) for s, v in d.items()} for k, d in runs.items()}
+
+
+def strip_a(out, dpanel='coll'):
     """(a) one-way latency, (b) throughput (measured, model hollow dotted), (c) collectives at two ranks: RDMA time / Loom
     time per data size (measured; model dotted for all-gather and all-to-all, which only move data: reduce-scatter and
-    all-reduce add the CPU's reduction, the same for both systems)."""
-    fig, axes = strip(4, ratios=(1, 1.12, 1, 1))   # (b) = the breakdown, after the latency (owner)
+    all-reduce add the CPU's reduction, the same for both systems). dpanel='reads' (2026-10-25 preview, strip 'A2'): (d) = the
+    time of one remote read instead of the collectives."""
+    fig, axes = strip(4, ratios=(1, 1.12, 1, 1), extra=0.6 if dpanel == 'reads' and pe.FIG9 else 0.0)   # (b) = the breakdown, after the latency (owner)
     fig.subplots_adjust(right=0.985, wspace=0.45)
     V = pe.val_model()
     SIZES = (0, 64, 256, 1024, 4096, 16384, 65536)
@@ -101,7 +164,11 @@ def strip_a(out):
     for k, color, mk, ls in (('h_rdma64', RDMA, 's', '--'), ('h_rdma1', RDMA, '^', '-'), ('h_stores', LOOM, 'o', '--'),
                              ('h_ptdma', LOOM, 'D', '-')):
         v = pe.lat(k, SIZES)
-        ax.plot(range(len(SIZES)), [a for a, _, _ in v], color=color, marker=mk, linestyle=ls, **LN)
+        ax.plot(range(len(SIZES)), [x[0] if x else np.nan for x in v], color=color, marker=mk, linestyle=ls, **LN)
+    STG = dict(color=RDMA, marker='v', linestyle='-.')   # 2026-10-25 (FIG9_DIR): RDMA staged by the CPU, measured
+    if dpanel == 'reads' and pe.FIG9:
+        v = pe.lat('h_rdma1_stg', SIZES)
+        ax.plot(range(len(SIZES)), [x[0] if x else np.nan for x in v], **STG, **LN)
     for sy, color, mk in (('rdma', RDMA, '^'), ('loom_stores', LOOM, 'o')):
         mv = [V.get(('e2', sy, str(s), 'oneway_us'), np.nan) for s in SIZES]
         ax.plot(range(len(SIZES)), mv, color=color, marker=mk, markeredgecolor=color, **MODEL_LN)
@@ -116,12 +183,37 @@ def strip_a(out):
         ax.plot(range(len(sizes)), [t[1] for t in d[key]], color=color, marker=mk, **LN)
         mv = [V.get(('e1', key, str(s), 'gbps'), np.nan) for s in sizes]
         ax.plot(range(len(sizes)), mv, color=color, marker={'rdma': '^', 'loom': 'D'}[key], markeredgecolor=color, **MODEL_LN)
+    if dpanel == 'reads' and 'rdma_stg' in d:
+        ax.plot(range(len(sizes)), [dict((t[0], t[1]) for t in d['rdma_stg']).get(s, np.nan) for s in sizes], **STG, **LN)
     ax.set_ylim(0, 14)
+    ax.set_yticks((0, 5, 10))
     size_ticks(ax, sizes)
     finish(ax, 'Throughput [GB/s]')
     title(ax, '(c) Throughput ' + UP)
     ax = axes[3]
-    _, res = pe.e5_data_h()
+    if dpanel == 'reads':
+        R = reads_data()
+        for k, color, mk, ls in (('rdma', RDMA, '^', '-'), ('rdma256', RDMA, 's', '--'), ('loads', LOOM, 'o', '--'),
+                                 ('ptdma', LOOM, 'D', '-')):
+            if R[k]:
+                ax.plot(range(len(READS_SIZES)), [R[k].get(s, np.nan) for s in READS_SIZES], color=color, marker=mk,
+                        linestyle=ls, **LN)
+        if R['ptdma_nora']:   # the DMA engine's reads without read-ahead (hollow + dotted is the model's style);
+            # (d) only, so its legend entry sits inside (d), in the empty upper left
+            ax.plot(range(len(READS_SIZES)), [R['ptdma_nora'].get(s, np.nan) for s in READS_SIZES], **NORA, **LN)
+            ax.legend([Line2D([0], [0], **NORA, **LN)], ['Loom, no\nread-ahead'], loc='upper left',
+                      fontsize=FONT['legend'], frameon=False, handlelength=1.6, handletextpad=0.4, borderaxespad=0.3)
+        ax.set_yscale('log')
+        size_ticks(ax, READS_SIZES)
+        ax.set_xticklabels([pe.size_label(s) for s in READS_SIZES], fontsize=FONT['tick'], rotation=40, ha='right',
+                           rotation_mode='anchor')
+        finish(ax, 'Time per read [µs]')
+        ax.yaxis.set_major_formatter(mticker.LogFormatterSciNotation())
+        title(ax, '(d) Reads ' + DOWN)
+    if dpanel == 'reads':
+        _, res = {}, {}
+    else:
+        _, res = pe.e5_data_h()
     sizes = sorted({k[2] for k in res})
     for c, name, color, mk in COLLS:
         y = [res[('rdma', c, s)][0] / res[('loom', c, s)][0] if ('rdma', c, s) in res and ('loom', c, s) in res else np.nan
@@ -130,25 +222,154 @@ def strip_a(out):
         if c in ('ag', 'a2a'):
             mr = [V.get(('e5', 'rdma', f'{c}_{s}', 'us'), np.nan) / V.get(('e5', 'loom', f'{c}_{s}', 'us'), np.nan) for s in sizes]
             ax.plot(range(len(sizes)), mr, color=color, marker=mk, markeredgecolor=color, **MODEL_LN)
-    ax.axhline(1.0, color='k', linewidth=0.6)
-    ax.set_ylim(0.8, 2.1)
-    size_ticks(ax, sizes)
-    finish(ax, 'RDMA / Loom time')
-    ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f'{v:g}×'))
-    title(ax, '(d) Collectives ' + UP)
+    if dpanel != 'reads':
+        ax.axhline(1.0, color='k', linewidth=0.6)
+        ax.set_ylim(0.8, 2.1)
+        size_ticks(ax, sizes)
+        finish(ax, 'RDMA / Loom time')
+        ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f'{v:g}×'))
+        title(ax, '(d) Collectives ' + UP)
     for a in (axes[0], axes[2], axes[3]):
-        a.set_xlabel('Data per message' if a is not axes[3] else 'Data per rank', fontsize=FONT['label'])
+        a.set_xlabel('Data per message' if a is not axes[3] else ('Data per read' if dpanel == 'reads' else 'Data per rank'),
+                     fontsize=FONT['label'])
     # (d) where one 8 B message's time goes (owner 2026-10-22: measured on the prototype, perf_rdma vs Loom's CPU stores)
-    panel_stages(axes[1], '(b) Where the time goes ' + DOWN, tsv=PROTO_STAGES_TSV, cats=PROTO_STAGE_CATS, xmax=9.5,
-                 xticks=(0, 2, 4, 6, 8), two_line=True, leg_cols=2, band=-2.45)
+    cats = PROTO_STAGE_CATS
+    if dpanel == 'reads' and pe.FIG9:   # writes and reads: the PCIe stages carry both, the far side's read is a host read
+        cats = tuple((k, {'PCIe write': 'PCIe', 'NIC read': 'host read'}.get(n, n), c) for k, n, c in cats)
+    panel_stages(axes[1], '(b) Where the time goes ' + DOWN, tsv=PROTO_STAGES_TSV, cats=cats, xmax=9.5,
+                 xticks=(0, 2, 4, 6, 8), two_line=True, leg_cols=2,
+                 band=-2.45 if not (dpanel == 'reads' and pe.FIG9) else -3.2,
+                 gpu_stage_ns=350 if dpanel == 'reads' and pe.FIG9 else None)
     h = [Line2D([0], [0], color=RDMA, marker='^', **LN), Line2D([0], [0], color=RDMA, marker='s', linestyle='--', **LN),
          Line2D([0], [0], color=LOOM, marker='D', **LN), Line2D([0], [0], color=LOOM, marker='o', linestyle='--', **LN),
          Line2D([0], [0], color='0.4', marker='o', markeredgecolor='0.4', **MODEL_LN)]
     lab = ['RDMA (one write)', 'RDMA (write per 64 B)', 'Loom (DMA engine)', 'Loom (CPU stores)', 'model']
+    if dpanel == 'reads':   # one legend for all panels: (d) draws the same styles for reads
+        lab = ['RDMA (one write or read)', 'RDMA (64 B writes, 256 B reads)' if READS256_DIR else 'RDMA (write per 64 B)',
+               'Loom (DMA engine)', 'Loom (CPU stores or loads)', 'model']
+        if pe.FIG9:
+            h.insert(1, Line2D([0], [0], **STG, **LN))
+            lab.insert(1, 'RDMA (one write), staged by the CPU')
+        legend(fig, h, lab, ncol=3 if pe.FIG9 else 5)
+        save(fig, out, 'strip-a2')
+        return
     h += [Line2D([0], [0], color=c, marker=m, **LN) for _, _, c, m in COLLS]
     lab += [n for _, n, _, _ in COLLS]
     legend(fig, h, lab, ncol=5)
     save(fig, out, 'strip-a')
+
+
+# Fig 8, strip 'A3' (owner 2026-10-26: "too tall, make them shorter"; no RDMA write per 64 B; the breakdown last; "in jigsaw
+# we had very clean legends"): as Jigsaw, factored legends: color = the system, marker + line = how the data moves, short
+# labels; the breakdown's stage legend above it; no legend inside a panel; the height of strips B and C.
+ENG = dict(marker='D', linestyle='-')                                    # RDMA's NIC (one write or READ) / Loom's copy engine
+CPU = dict(marker='o', linestyle='--')                                   # Loom's CPU stores or loads
+STAGED = dict(marker='v', linestyle='-.')                                # RDMA after the CPU's copy into a registered buffer
+R256 = dict(marker='s', linestyle='--')                                  # RDMA, one READ per 256 B
+NORA3 = dict(marker='D', linestyle='-.', markerfacecolor='#c7e9c0')      # Loom's copy engine without read-ahead
+
+
+def panel_breakdown(ax, ttl, tsv, cats, xmax=12.5):
+    """Breakdown as pairs (owner 2026-10-26 "what the fuck is going on in 8d?" at 7 bars grouped by system): RDMA over Loom
+    for seen (the receiver sees the message), free (the sender may reuse its buffer) and read (an 8 B remote read); each bar
+    named at its end in its system's color. No staged bar (a 0.35 us computed GPU copy: a sliver; the text gives it)."""
+    rows = list(csv.DictReader(open(tsv), delimiter='\t'))
+    col = {k: c for k, _, c in cats}
+    col['Loom pipeline'] = col['network']   # Loom's 21 + 7 ns pipelines: too short to see, drawn with the network
+    groups = (('seen', 'receiver'), ('free', 'sender'), ('read', 'read'))
+    y, ticks = 0.0, []
+    for name, bar in groups:
+        for sy, sname, scol in (('rdma', 'RDMA', RDMA), ('loom', 'Loom', LOOM)):
+            segs = [r for r in rows if r['system'] == sy and r['bar'] == bar]
+            for r in segs:
+                a, b = float(r['start_ns']) / 1e3, float(r['end_ns']) / 1e3
+                ax.barh(y, b - a, left=a, height=0.8, color=col[r['category']], edgecolor='k', linewidth=0.3)
+            end = max(float(r['end_ns']) for r in segs) / 1e3
+            ax.text(end + 0.2, y, f'{sname} ' + (f'{end:.1f}' if end >= 1 else f'{end:.2f}'), va='center', ha='left',
+                    fontsize=FONT['note'], color=scol, fontweight='bold')
+            y += 1
+        ticks.append((y - 1.5, name))
+        y += 0.6
+    ax.set_xlim(0, xmax)
+    ax.set_xticks((0, 2, 4, 6, 8, 10))
+    finish(ax, None, 'Time [µs]')
+    ax.set_yticks([t for t, _ in ticks])
+    ax.set_yticklabels([n for _, n in ticks], fontsize=FONT['label'])
+    ax.tick_params(axis='y', length=0)
+    ax.set_ylim(y - 0.5 - 0.1, -0.6)
+    ax.grid(False, axis='y')
+    title(ax, ttl)
+
+
+def strip_a3(out):
+    fig, axes = strip(4, ratios=(1, 1, 1, 1.0))
+    fig.subplots_adjust(right=0.985, wspace=0.45)
+    V = pe.val_model()
+    plot = lambda ax, xs, ys, color, st, **kw: ax.plot(range(len(xs)), ys, color=color, **{**LN, **st, **kw})
+    # (a) one-way latency
+    SIZES = (0, 64, 256, 1024, 4096, 16384, 65536)
+    ax = axes[0]
+    for k, color, st in (('h_rdma1', RDMA, ENG), ('h_rdma1_stg', RDMA, STAGED), ('h_ptdma', LOOM, ENG), ('h_stores', LOOM, CPU)):
+        plot(ax, SIZES, [x[0] if x else np.nan for x in pe.lat(k, SIZES)], color, st)
+    for sy, color, st in (('rdma', RDMA, ENG), ('loom_stores', LOOM, CPU)):
+        plot(ax, SIZES, [V.get(('e2', sy, str(s), 'oneway_us'), np.nan) for s in SIZES], color, {**MODEL_LN, 'marker': st['marker']},
+             markeredgecolor=color)
+    ax.set_yscale('log'); ax.set_ylim(3, 400)
+    size_ticks(ax, SIZES)
+    finish(ax, 'One-way latency [µs]', 'Data per message')
+    title(ax, '(a) Write latency ' + DOWN)   # owner 2026-10-26: "say write latency in 8a"
+    # (b) throughput
+    ax = axes[1]
+    d = pe.e1_series_h()
+    sizes = [s for s, *_ in d['loom']]
+    for key, color in (('rdma', RDMA), ('loom', LOOM)):
+        plot(ax, sizes, [t[1] for t in d[key]], color, ENG)
+        plot(ax, sizes, [V.get(('e1', key, str(s), 'gbps'), np.nan) for s in sizes], color, {**MODEL_LN, 'marker': 'D'},
+             markeredgecolor=color)
+    stg = dict((t[0], t[1]) for t in d.get('rdma_stg', ()))
+    plot(ax, sizes, [stg.get(s, np.nan) for s in sizes], RDMA, STAGED)
+    ax.set_ylim(0, 14)
+    ax.set_yticks((0, 5, 10))
+    size_ticks(ax, sizes)
+    finish(ax, 'Throughput [GB/s]', 'Data per message')
+    title(ax, '(b) Throughput ' + UP)
+    # (c) reads
+    ax = axes[2]
+    R = reads_data()
+    for k, color, st in (('rdma', RDMA, ENG), ('rdma256', RDMA, R256), ('ptdma_nora', LOOM, NORA3), ('loads', LOOM, CPU),
+                         ('ptdma', LOOM, ENG)):
+        if R[k]:
+            plot(ax, READS_SIZES, [R[k].get(s, np.nan) for s in READS_SIZES], color, st)
+    ax.set_yscale('log')
+    size_ticks(ax, READS_SIZES)
+    ax.set_xticklabels([pe.size_label(s) for s in READS_SIZES], fontsize=FONT['tick'], rotation=40, ha='right',
+                       rotation_mode='anchor')
+    finish(ax, 'Time per read [µs]', 'Data per read')
+    ax.yaxis.set_major_formatter(mticker.LogFormatterSciNotation())
+    title(ax, '(c) Reads ' + DOWN)
+    # (d) where the time goes
+    cats = (('PCIe write', 'PCIe', '#9ecae1'), ('NIC read', 'host read', '#fc9272'), ('network', 'network', '#fdae6b'),
+            ('ACK and completion', 'ACK + completion', '#d9f0d3'), ('CPU', 'CPU', '0.6'))
+    panel_breakdown(axes[3], '(d) Latency breakdown ' + DOWN, PROTO_STAGES_TSV, cats)
+    cats = cats[:-1]   # the CPU's 40-60 ns are too short to see: no legend entry (the text gives them)
+    # legends: (a)-(c) factored (Jigsaw), the stages above (d)
+    g = '0.25'
+    h = [Line2D([0], [0], color=RDMA, linewidth=1.6), Line2D([0], [0], color=LOOM, linewidth=1.6)]
+    lab = ['RDMA', 'Loom']
+    for st, name in ((ENG, 'NIC or copy engine'), (CPU, 'CPU stores or loads'), (STAGED, 'CPU copy first'),
+                     (R256, 'READ per 256 B'), ({**NORA3, 'markerfacecolor': '0.85'}, 'no read-ahead')):
+        h.append(Line2D([0], [0], color=g, **{**LN, 'markerfacecolor': g, **st}))
+        lab.append(name)
+    h.append(Line2D([0], [0], color=g, **{**MODEL_LN, 'marker': 'o'}, markeredgecolor=g))
+    lab.append('model')
+    x0, x1 = axes[0].get_position().x0, axes[2].get_position().x1
+    fig.legend(h, lab, loc='upper center', bbox_to_anchor=((x0 + x1) / 2, 1.005), ncol=4, frameon=False,
+               fontsize=FONT['legend'], columnspacing=1.2, handletextpad=0.4, borderaxespad=0.1)
+    fig.legend([Patch(facecolor=c, edgecolor='k', linewidth=0.3, hatch='////' if c == 'white' else None) for _, _, c in cats],
+               [n for _, n, _ in cats], loc="upper right", bbox_to_anchor=(0.998, 1.005), ncol=2, frameon=False,
+               fontsize=FONT['note'], handlelength=0.9, columnspacing=0.6, handletextpad=0.3, borderaxespad=0.1,
+               labelspacing=0.35)
+    save(fig, out, 'strip-a3')
 
 
 # ----------------------------------------------------------------------- C: sensitivity (model)
@@ -162,12 +383,22 @@ PROTO_STAGE_CATS = (('CPU', 'CPU', '0.6'), ('PCIe write', 'PCIe write', '#9ecae1
 PROTO_STAGES_TSV = os.environ.get('PROTO_STAGES_TSV', '/home/harshanavkis/loom-experiments/e2/20261022_1443_breakdown/stages.tsv')
 
 
-def panel_stages(ax, ttl, tsv=None, cats=STAGE_CATS, xmax=14, xticks=(0, 5, 10), two_line=False, leg_cols=3, band=-1.55):
+def panel_stages(ax, ttl, tsv=None, cats=STAGE_CATS, xmax=14, xticks=(0, 5, 10), two_line=False, leg_cols=3, band=-1.55,
+                 gpu_stage_ns=None):
     """Plan A (owner 2026-10-22): one 64 B message between two GPUs on one switch (tools/stage_breakdown.py): each
     system's stages until the receiver sees the signal ("seen") and until the sender may reuse its buffer ("free")."""
     rows = list(csv.DictReader(open(tsv or STAGES_TSV), delimiter='\t'))
     bars = (('rdma', 'receiver', 'RDMA, seen'), ('rdma', 'sender', 'RDMA, free'),
             ('loom', 'receiver', 'Loom, seen'), ('loom', 'sender', 'Loom, free'))
+    if gpu_stage_ns:   # 2026-10-25 (owner): RDMA staged by a GPU = the measured RDMA receiver bar after a computed GPU copy
+        g = [dict(r, system='rdma_gpu', start_ns=str(float(r['start_ns']) + gpu_stage_ns), end_ns=str(float(r['end_ns']) + gpu_stage_ns))
+             for r in rows if r['system'] == 'rdma' and r['bar'] == 'receiver']
+        rows += g + [dict(system='rdma_gpu', bar='receiver', stage='GPU staging copy', category='GPU copy',
+                          start_ns='0', end_ns=str(gpu_stage_ns), source='computed')]
+        bars = bars[:1] + (('rdma_gpu', 'receiver', 'Staged, seen'),) + bars[1:]   # RDMA staged by a GPU (caption)
+    if any(r['bar'] == 'read' for r in rows):   # 2026-10-25: one 8 B remote read per system (breakdown_stages.py <dir> <reads>)
+        bars = bars + (('rdma', 'read', 'RDMA, read'), ('loom', 'read', 'Loom, read'))
+        cats = cats + (('GPU copy', 'GPU copy', 'white'),)
     col = {k: c for k, _, c in cats}
     col['Loom pipeline'] = col['network stack' if 'network stack' in col else 'network']   # Loom's 21 + 7 ns pipelines: too short to see, drawn with the stack (caption)
     for i, (sy, bar, _) in enumerate(bars):
@@ -175,7 +406,8 @@ def panel_stages(ax, ttl, tsv=None, cats=STAGE_CATS, xmax=14, xticks=(0, 5, 10),
         segs = [r for r in rows if r['system'] == sy and r['bar'] == bar]
         for r in segs:
             a, b = float(r['start_ns']) / 1e3, float(r['end_ns']) / 1e3
-            ax.barh(y, b - a, left=a, height=0.62, color=col[r['category']], edgecolor='k', linewidth=0.3)
+            ax.barh(y, b - a, left=a, height=0.62, color=col[r['category']], edgecolor='k', linewidth=0.3,
+                    hatch='////' if r['category'] == 'GPU copy' else None)
         end = max(float(r['end_ns']) for r in segs) / 1e3
         ax.text(end + 0.15, y, f'{end:.1f}' if end >= 1 else f'{end:.2f}', va='center', ha='left', fontsize=FONT['note'])
     ax.set_xlim(0, xmax)
@@ -184,10 +416,11 @@ def panel_stages(ax, ttl, tsv=None, cats=STAGE_CATS, xmax=14, xticks=(0, 5, 10),
     ax.set_yticks(range(len(bars)))
     ax.set_yticklabels([lab.replace(', ', '\n') if two_line else lab for *_, lab in bars][::-1], fontsize=FONT['tick'],
                        linespacing=0.9)
-    ax.set_ylim(band, 3.5)   # a band below the bars for the stage legend
+    ax.set_ylim(band, len(bars) - 0.5)   # a band below the bars for the stage legend
     ax.grid(False, axis='y')
     title(ax, ttl)
-    ax.legend([Patch(facecolor=c, edgecolor='k', linewidth=0.3) for _, _, c in cats], [n for _, n, _ in cats],
+    ax.legend([Patch(facecolor=c, edgecolor='k', linewidth=0.3, hatch='////' if c == 'white' else None) for _, _, c in cats],
+              [n for _, n, _ in cats],
               loc='lower center', ncol=leg_cols, fontsize=FONT['note'] - 0.5, frameon=False, handlelength=0.9, columnspacing=0.5,
               labelspacing=0.15, handletextpad=0.3, borderaxespad=0.15)
 
@@ -196,7 +429,8 @@ def strip_c(out):
     """Sensitivity only (owner 2026-10-22: the time breakdown moves to the prototype's Fig 9, measured): (a-c) Loom's lead
     vs the link rate, PCIe latencies and network stack, as Fig 13 (one message 64 B .. 64 KiB, all-to-all of 16 KiB per GPU
     on 16 GPUs), (d) Loom's own pipeline depth (plan B; run_sweep_an.py pipe<k>: 21 + 7 cycles x k)."""
-    fig, axes = strip(4, bottom=0.47)
+    # 2026-10-26: no rotated ticks -> 0.17 in less below; the legend in one row (owner); same panel height
+    fig, axes = strip(4, legend_rows=1, bottom=0.30, extra=-0.17)
     rows = [l.split('\t') for l in open(SWEEP_TSV).read().splitlines()[1:]]
     v = {(r[0], r[1], r[2], int(r[3])): float(r[4]) for r in rows}
     scales = (0.25, 0.5, 1, 1.5, 2)
@@ -232,11 +466,15 @@ def strip_c(out):
         ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda q, _: f'{q:g}×'))
         title(ax, ttl)
     axes[3].axvline(300 / 28, color='grey', linestyle='-.', linewidth=0.8)   # one switch hop (the model's 300 ns)
+    # 2026-10-26 (owner: "what is nominal", "legends in a single row"): one row, "one message:" once in front of its sizes;
+    # "nominal" = the dotted line at each parameter's setup value -> "setup's value" (the caption's words)
+    # later (owner: "do we really need to say 'one message'?"): no; the caption says one message of 64 B-64 KiB
     h = [Line2D([0], [0], color=c, marker=mk, linestyle='--' if e == 'a2a' else '-', **LN) for e, _, c, mk, _ in series]
-    lab = [f'one message, {n}' if e == 'lat' else 'all-to-all, 16 KiB/GPU' for e, _, _, _, n in series]
+    lab = [n if e == 'lat' else 'all-to-all, 16 KiB/GPU' for e, _, _, _, n in series]
     h += [Line2D([0], [0], color='grey', linestyle=':', linewidth=0.8), Line2D([0], [0], color='grey', linestyle='-.', linewidth=0.8)]
-    lab += ['nominal', 'one switch hop (300 ns)']
-    legend(fig, h, lab, ncol=4)
+    lab += ["setup's value", 'one switch hop (300 ns)']
+    fig.legend(h, lab, loc='upper center', bbox_to_anchor=(0.53, 1.005), ncol=len(h), frameon=False, fontsize=FONT['legend'],
+               columnspacing=1.0, handletextpad=0.4, borderaxespad=0.1)
     save(fig, out, 'strip-c')
 
 
@@ -348,7 +586,8 @@ def strip_b(out):
             ax.annotate(f'{r[0] / l[0]:.2f}×', (i, 1.0), xytext=(0, 1.2), textcoords='offset points',   # above the pair
                         ha='center', va='bottom', rotation=90, fontsize=FONT['note'], color='firebrick')
         ax.set_xticks(range(len(TOKENS))); ax.set_xticklabels([str(t) for t in TOKENS], rotation=45, ha='right', rotation_mode='anchor')
-        ax.set_xlim(-0.6, len(TOKENS) - 0.4); ax.set_ylim(0, 1.45)
+        ax.set_xlim(-0.6, len(TOKENS) - 0.4); ax.set_ylim(0, 1.7)   # 1.45 before the 2026-10-26 shorter panels: the ratios hit the title
+        ax.set_yticks((0, 0.5, 1))
         finish(ax, 'Decode step [norm.]' if k == 0 else None, f'{ep} GPUs')
         ax.grid(False, axis='x')
         if k == 1:
@@ -384,6 +623,6 @@ if __name__ == '__main__':
     out = sys.argv[1]
     os.makedirs(out, exist_ok=True)
     only = sys.argv[2].split(',') if len(sys.argv) > 2 else ['A', 'B', 'C']
-    for k, fn in (('A', strip_a), ('B', strip_b), ('C', strip_c)):
+    for k, fn in (('A', strip_a), ('A2', lambda o: strip_a(o, 'reads')), ('A3', strip_a3), ('B', strip_b), ('C', strip_c)):
         if k in only:
             fn(out)
