@@ -161,7 +161,7 @@ void flush(void* p) {
             } else {
                 double& busy = stage_busy[src];
                 busy = std::max(busy, t) + (double)p.b / m.cfg.stage_gbps;
-                tp = last_post[p.i] = busy + m.cfg.stage_ns;
+                tp = last_post[p.i] = busy;
             }
         } else if (L > 0) {
             if (p.sig) {

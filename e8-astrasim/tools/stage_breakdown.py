@@ -10,8 +10,8 @@ import os, re, subprocess, sys, tempfile
 E = '/scratch/harshanavkis/loom-proj/e8-astrasim'
 cdir, out = sys.argv[1], sys.argv[2]
 GPU = {'rdma': (2560, "DeepEP's post call (measured)"), 'loom': (710, 'stores + release signal, one warp (measured)')}
-STAGE = 350 + 64 / 2400.0   # RDMA copies the message into its registered buffer first (cluster STAGE_COPY: 350 ns measured
-                            # + bytes at 2.4 TB/s, H200 spec); an_replay has no frontend, so it is added here
+STAGE = 64 / 2400.0   # RDMA copies the message into its registered buffer first (cluster STAGE_COPY: bytes at 2.4 TB/s,
+                      # H200 spec; no fixed latency, owner 2026-10-26: was 350 ns); an_replay has no frontend, so it is added here
 
 
 def trace(v):
@@ -41,7 +41,7 @@ rx = cfgval('rdma', 'NIC_RX_NS')
 g, gsrc = GPU['rdma']
 g += STAGE
 for bar in ('receiver', 'sender'):
-    seg('rdma', bar, 'GPU copies into its registered buffer', 'GPU', 0, STAGE, 'copy: 350 ns measured + 64 B at the H200 spec')
+    seg('rdma', bar, 'GPU copies into its registered buffer', 'GPU', 0, STAGE, 'copy: 64 B at the H200 spec')
     seg('rdma', bar, 'GPU posts', 'GPU', STAGE, g, gsrc)
     seg('rdma', bar, 'doorbell', 'PCIe write', g, g + sig['db'], 'PCIe write, measured')
     seg('rdma', bar, 'NIC fetches request', 'NIC read', g + sig['db'], g + data['wqe'], 'PCIe read, measured')

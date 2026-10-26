@@ -57,7 +57,7 @@ variants = {
     "pull_nvshmem": "HOST_IF_MODE pull\nPOST_NS 7330\n",
     "push": "HOST_IF_MODE push\n",
     "rdma": nic + "NIC_BF 0\nINLINE_MAX 0\nNIC_TX_NS 260\nNIC_RX_NS 590\n"
-            "STAGE_COPY 350 2400 524288\n",   # staging copy before each post (owner 2026-10-22; LoomNet.hh)
+            "STAGE_COPY 2400 524288\n",   # staging copy before each post (owner 2026-10-22; LoomNet.hh), no fixed latency (10-26)
     "loom": nic + loom + "NIC_TX_NS 281\nNIC_RX_NS 597\n",   # 21 / 7 cycles (RTL, 1 ns) + NIC stack 260 / 590 ns
     "loom250": nic + loom + "NIC_TX_NS 84\nNIC_RX_NS 28\n",
 }

@@ -91,6 +91,7 @@ e8/cfg/steve_nic/base.txt; none is fitted to the dispatch/combine runs used for 
 | GPU doorbell + NIC write visible to a polling SM | 645 + 645 ns | split of 1290 ns; DeepEP single put 5.45 us, measured |
 | PCIe payload rate per direction | 57.6 GB/s | Gen5 x16 x 256/280 (computed) |
 | WQE size, WQEs per fetch, PCIe max read request | 64 B, no limit (was 64 until 2026-10-26), 4096 B | model settings |
+| RDMA staging copy (`STAGE_COPY <GB/s> <chunk>`) | bytes at 2400 GB/s, 512 KiB pieces, no fixed latency (350 ns until 2026-10-26: a 7 KiB token's measured copy, charged as fixed on top of the bytes) | H200 HBM spec 4.8 TB/s / 2 |
 | Loom pipeline | 21 / 7 cycles | Loom RTL |
 | switch + cable per hop | ~300 ns | owner-approved cluster |
 

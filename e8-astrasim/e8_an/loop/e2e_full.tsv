@@ -1,17 +1,17 @@
 key	label	variant	iter_ms	exposed_ms	gpus	log
-dp	DP	rdma	697.386	282.041	64	an_sw_dp__n64nm__rdma_20261022_134344.log
+dp	DP	rdma	697.293	281.949	64	an_sw_dp__n64nm__rdma_20261026_185709.log
 dp	DP	loom	696.515	281.171	64	an_sw_dp__n64nm__loom_20261021_123918.log
-fsdp	FSDP	rdma	711.609	296.583	64	an_sw_fsdp__n64nm__rdma_20261022_134344.log
+fsdp	FSDP	rdma	711.530	296.504	64	an_sw_fsdp__n64nm__rdma_20261026_185709.log
 fsdp	FSDP	loom	711.270	296.244	64	an_sw_fsdp__n64nm__loom_20261021_123918.log
-pp	PP	rdma	2069.562	1095.030	64	an_sw_pp__n64nm__rdma_20261022_134344.log
+pp	PP	rdma	2069.557	1095.025	64	an_sw_pp__n64nm__rdma_20261026_185709.log
 pp	PP	loom	2065.802	1091.269	64	an_sw_pp__n64nm__loom_20261021_123918.log
-cp	CP	rdma	641.809	535.807	64	an_sw_cp__n64nm__rdma_20261022_134344.log
+cp	CP	rdma	641.630	535.627	64	an_sw_cp__n64nm__rdma_20261026_185709.log
 cp	CP	loom	640.387	534.384	64	an_sw_cp__n64nm__loom_20261021_123918.log
-hybrid	TP+PP+DP	rdma	1849.975	927.215	64	an_sw_hybrid__n64nm__rdma_20261022_134412.log
+hybrid	TP+PP+DP	rdma	1849.897	927.137	64	an_sw_hybrid__n64nm__rdma_20261026_185709.log
 hybrid	TP+PP+DP	loom	1848.686	925.927	64	an_sw_hybrid__n64nm__loom_20261021_123918.log
-l80	Llama-80B	rdma	10766.967	8574.907	128	an_sw_l80__n128nm__rdma_20261022_134413.log
+l80	Llama-80B	rdma	10766.930	8574.870	128	an_sw_l80__n128nm__rdma_20261026_185709.log
 l80	Llama-80B	loom	10767.287	8575.227	128	an_sw_l80__n128nm__loom_20261021_123924.log
-moe_mixed	MoE EP+TP+DP	rdma	34535.516	32550.575	64	an_sw_moe_mixed_ep64__n64nm__rdma_20261022_150743.log
+moe_mixed	MoE EP+TP+DP	rdma	34534.740	32549.800	64	an_sw_moe_mixed_ep64__n64nm__rdma_20261026_185738.log
 moe_mixed	MoE EP+TP+DP	loom	34526.546	32541.606	64	an_sw_moe_mixed_ep64__n64nm__loom_20261021_124524.log
-moe_scaleout	MoE EP+DP	rdma	240527.236	226080.240	64	an_sw_moe_scaleout_ep8__n64nm__rdma_20261022_150743.log
+moe_scaleout	MoE EP+DP	rdma	240526.899	226079.903	64	an_sw_moe_scaleout_ep8__n64nm__rdma_20261026_185739.log
 moe_scaleout	MoE EP+DP	loom	240531.051	226084.055	64	an_sw_moe_scaleout_ep8__n64nm__loom_20261021_124558.log

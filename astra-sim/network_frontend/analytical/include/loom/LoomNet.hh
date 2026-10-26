@@ -56,11 +56,12 @@ struct Config {
     double loop_ns[2] = {0, 0}, loop_first[2] = {0, 0}, loop_last[2] = {0, 0};
     uint32_t db_batch = 1;                   // DOORBELL_BATCH: RDMA rings a queue pair at every n-th put of a send loop
                                              // (1 = every put; DeepEP 4, ibgda_device.cuh; 0 = only with the signal)
-    // STAGE_COPY <ns> <GB/s> <chunk bytes> (RDMA only, 0 = off): the sending GPU copies each put into its registered
-    // buffer before posting it (DeepEP's send buffer, NCCL's connection buffer slot): <ns> + bytes / <GB/s>, one GPU's
+    // STAGE_COPY <GB/s> <chunk bytes> (RDMA only, 0 = off): the sending GPU copies each put into its registered
+    // buffer before posting it (DeepEP's send buffer, NCCL's connection buffer slot): bytes / <GB/s>, one GPU's
     // copies back to back; puts are cut to <chunk> so a chunk's copy overlaps the previous chunk's transfer. Not with a
-    // send loop (POST_LOOP_NS: its measured time contains the copy). The signal follows the last copied put.
-    double stage_ns = 0, stage_gbps = 0;
+    // send loop (POST_LOOP_NS: its measured time contains the copy). The signal follows the last copied put. No fixed
+    // latency per copy (owner 2026-10-26: no specification gives one; was <ns> in front, 350).
+    double stage_gbps = 0;
     uint64_t stage_chunk = 0;
 
     static int ep(const std::string& s) { return s == "host" ? HOST : s == "nic" ? NIC : GPU; }
@@ -113,7 +114,7 @@ struct Config {
             else if (k == "POST_LOOP_NS") is >> loop_ns[0] >> loop_first[0] >> loop_last[0];
             else if (k == "POST_LOOP_HIGH_NS") is >> loop_ns[1] >> loop_first[1] >> loop_last[1];
             else if (k == "DOORBELL_BATCH") is >> db_batch;
-            else if (k == "STAGE_COPY") is >> stage_ns >> stage_gbps >> stage_chunk;
+            else if (k == "STAGE_COPY") is >> stage_gbps >> stage_chunk;
         }
         return true;
     }

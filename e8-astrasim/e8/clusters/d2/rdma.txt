@@ -90,6 +90,6 @@ INLINE_MAX 0
 NIC_TX_NS 260
 NIC_RX_NS 590
 
-# staging copy before each RDMA post (DeepEP send buffer / NCCL buffer slot; owner 2026-10-22): 350 ns measured
-# (harness, per warp) + bytes at 2.4 TB/s (H200 spec HBM 4.8 TB/s, read + write), 512 KiB chunks (NCCL slot)
-STAGE_COPY 350 2400 524288
+# staging copy before each RDMA post (DeepEP send buffer / NCCL buffer slot; owner 2026-10-22): bytes at 2.4 TB/s
+# (H200 spec HBM 4.8 TB/s, read + write), 512 KiB chunks (NCCL slot); no fixed latency (owner 2026-10-26; was 350 ns)
+STAGE_COPY 2400 524288

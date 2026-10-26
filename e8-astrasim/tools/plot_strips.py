@@ -239,7 +239,7 @@ def strip_a(out, dpanel='coll'):
     panel_stages(axes[1], '(b) Where the time goes ' + DOWN, tsv=PROTO_STAGES_TSV, cats=cats, xmax=9.5,
                  xticks=(0, 2, 4, 6, 8), two_line=True, leg_cols=2,
                  band=-2.45 if not (dpanel == 'reads' and pe.FIG9) else -3.2,
-                 gpu_stage_ns=350 if dpanel == 'reads' and pe.FIG9 else None)
+                 gpu_stage_ns=None)   # 2026-10-26: no fixed copy latency (was 350 ns computed)
     h = [Line2D([0], [0], color=RDMA, marker='^', **LN), Line2D([0], [0], color=RDMA, marker='s', linestyle='--', **LN),
          Line2D([0], [0], color=LOOM, marker='D', **LN), Line2D([0], [0], color=LOOM, marker='o', linestyle='--', **LN),
          Line2D([0], [0], color='0.4', marker='o', markeredgecolor='0.4', **MODEL_LN)]
