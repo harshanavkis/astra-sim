@@ -789,7 +789,7 @@ def figure_e5(out_dir, png_dir):
 
 
 # ------------------------------------------------------------------------ link-rate sweep (model)
-SWEEP = 'val_model/sweep_an/current/sweep.tsv' if AN else 'val_model/sweep/current/sweep.tsv'   # ~/loom-experiments/val_model/run_sweep.py (owner 2026-10-20)
+SWEEP = 'val_model/sweep_astra/current/sweep.tsv' if AN else 'val_model/sweep/current/sweep.tsv'   # 2026-10-27: run_sweep_astra.py (ASTRA-sim); was sweep_an (an_replay); ns-3: run_sweep.py (owner 2026-10-20)
 SWEEP_RATES = (('100', 100), ('200', 200), ('400', 400), ('800', 800), ('1600', 1600))
 SIZE_COLORS = ('tab:orange', 'tab:red', 'tab:purple', 'tab:brown')
 

@@ -1,24 +1,23 @@
 #!/usr/bin/env python3
 """alpha-beta view of the LoomNet model (SCALE / NCCL notation, T(n) = alpha + n / beta) for one message between two GPUs:
-runs bin/an_replay on a cluster config (one put + the 8 B signal, as the ASTRA-sim frontend sends a message) and fits
+runs one message through ASTRA-sim on a cluster config (tools/astra_p2p.py; 2026-10-27, was bin/an_replay, which has no
+frontend: ASTRA-sim adds the frontend's work, e.g. RDMA's staging copy) and fits
 alpha and beta to the delivered time and to the sender's release over 64 KiB .. 64 MiB; prints the small-message times.
    alpha_beta.py <cluster dir, e.g. e8/clusters/n64nm> [src dst]      (model numbers)"""
-import os, subprocess, sys, tempfile
+import os, sys
 E = '/scratch/harshanavkis/loom-proj/e8-astrasim'
+sys.path.insert(0, f'{E}/tools')
+from astra_p2p import one_message
 cl = sys.argv[1]; src, dst = (int(sys.argv[2]), int(sys.argv[3])) if len(sys.argv) > 3 else (0, 8)
 sizes = [8, 64, 512, 4096, 16384, 65536, 262144, 1 << 20, 4 << 20, 16 << 20, 64 << 20]
-def run(v, s):
-    d = tempfile.mkdtemp(dir=os.environ.get('TMPDIR', '/tmp'))
-    open(f'{d}/r', 'w').write(f'flow 0 {src} {dst} 0 1 {s} 1 0 0 start 0\n')
-    subprocess.run([f'{E}/bin/an_replay', f'{E}/{cl}/{v}.txt', f'{d}/r', f'{d}/o'], check=True)
-    f = open(f'{d}/o').read().split()
-    sig, cqe, out = int(f[5]), int(f[6]), int(f[7])
-    return sig, (out if v == 'loom' else cqe)
+def run(v, s):   # (delivered, sender released) ns
+    r = one_message(f'{E}/{cl}/{v}.txt', s, src=src, dst=dst)
+    return r['delivered'], r['released']
 def fit(xs, ys):
     n = len(xs); mx, my = sum(xs) / n, sum(ys) / n
     b = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sum((x - mx) ** 2 for x in xs)
     return my - b * mx, 1 / b
-print(f'# {cl}: GPU {src} -> GPU {dst}, one message = one put + 8 B signal (model)')
+print(f'# {cl}: GPU {src} -> GPU {dst}, one message = one put + 8 B signal (model, ASTRA-sim)')
 print(f'{"bytes":>10} {"RDMA deliv":>11} {"RDMA release":>13} {"Loom deliv":>11} {"Loom release":>13}   ns')
 R = {v: {s: run(v, s) for s in sizes} for v in ('rdma', 'loom')}
 for s in sizes:

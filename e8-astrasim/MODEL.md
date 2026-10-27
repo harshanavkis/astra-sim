@@ -319,3 +319,13 @@ combine (+13-18% -> +-4% of ns-3) and the 16-GPU 64 MiB all-to-all (840 -> 712 u
 ns-3 had it. Owner decision needed before any paper number moves.
 2026-10-21 (owner): no interleaving - whole puts, first come first served on every resource (as Opus); round-robin
 engines removed. NIC reads payloads in posting order (WQE-fetch order made RDMA MoE 43-73% slow via incast bursts).
+2026-10-27 (owner: every experiment on the ASTRA-sim layer, no hand-written replayer): the prototype validation runs in
+ASTRA-sim (val_model/run_val_astra.py: Chakra traces of the tools' steps, gen_p2p/gen_proto_coll/gen_bcast), the
+sensitivity sweep too (val_model/run_sweep_astra.py; one message = gen_p2p.py --pre <GPU work> + the frontend's staging
+copy; all 190 values within 2 ns of an_replay), and alpha_beta.py / stage_breakdown.py / sweep_p2p.py (tools/astra_p2p.py:
+one message on any cluster config, gen_p2p.py --npus/--src/--dst). run_an_all.sh calls these; run_val_an.py /
+run_sweep_an.py / run_sweep.py refuse to run without ALLOW_REPLAYER=1; the an_loomreplay H200 dispatch check is retired.
+At scale RDMA's collectives never wait for a completion (ASTRA-sim's own collectives): its best case; NCCL 2.28 refills each
+of 8 slots per connection only after the slot's send completed, which a 64-GPU ring would hit with 1-2 channels (not with
+>= 4; computed from the model's traces). Decode's DeepEP double buffering never delays a step (gen_decode.py NOREUSE=1,
+identical at EP64 1-128 / EP256 1-16 tokens).
