@@ -110,6 +110,13 @@ READS_SIZES = (8, 256, 4096, 65536, 1048576, 16777216)
 # switch as 256 B pieces): RDMA with one READ per 256 B, posted back to back (rdma_pingpong --read --chunk 256), MEASURED,
 # ~/loom-experiments/e2/<time>_rdchunk (run_rdchunk_20261026.sh, interleaved with the normal READ, 3 runs, median of medians)
 READS256_DIR = os.environ.get('READS256_DIR', '')
+# 2026-10-27 (owner: 256 B is not representative; Loom's switch fetches 4 KiB pages): the chunked READs' size comes from the
+# logs (rdma_chunk<C>_*: one READ per C bytes); Fig 8 (c) uses e2/20261027_1237_rdchunk4k (C = 4096)
+def reads_chunk():
+    import glob, re
+    for f in glob.glob(os.path.join(READS256_DIR, 'rdma_chunk*_run*.client.log')) if READS256_DIR else ():
+        return int(re.search(r'rdma_chunk(\d+)_', os.path.basename(f)).group(1))
+    return 256
 NORA = dict(color=LOOM, marker='D', markerfacecolor='#c7e9c0', linestyle='-.')   # Loom's DMA engine without read-ahead
 
 
@@ -144,8 +151,8 @@ def reads_data():
         m = re.search(r'read (\d+) B round trip \(ns.*?p50 (\d+)', open(f, errors='replace').read())
         if m:
             runs['rdma'].setdefault(int(m.group(1)), []).append(float(m.group(2)) / 1e3)
-    for f in glob.glob(os.path.join(READS256_DIR, 'rdma_chunk256_*_run*.client.log')) if READS256_DIR else ():
-        m = re.search(r'read (\d+) B in 256 B READs round trip \(ns.*?p50 (\d+)', open(f, errors='replace').read())
+    for f in glob.glob(os.path.join(READS256_DIR, 'rdma_chunk*_run*.client.log')) if READS256_DIR else ():
+        m = re.search(r'read (\d+) B in \d+ B READs round trip \(ns.*?p50 (\d+)', open(f, errors='replace').read())
         if m:
             runs['rdma256'].setdefault(int(m.group(1)), []).append(float(m.group(2)) / 1e3)
     return {k: {s: statistics.median(v) for s, v in d.items()} for k, d in runs.items()}
@@ -357,7 +364,7 @@ def strip_a3(out):
     h = [Line2D([0], [0], color=RDMA, linewidth=1.6), Line2D([0], [0], color=LOOM, linewidth=1.6)]
     lab = ['RDMA', 'Loom']
     for st, name in ((ENG, 'NIC or copy engine'), (CPU, 'CPU stores or loads'), (STAGED, 'CPU copy first'),
-                     (R256, 'READ per 256 B'), ({**NORA3, 'markerfacecolor': '0.85'}, 'no read-ahead')):
+                     (R256, 'READ per 4 KiB' if reads_chunk() == 4096 else f'READ per {reads_chunk()} B'), ({**NORA3, 'markerfacecolor': '0.85'}, 'no read-ahead')):
         h.append(Line2D([0], [0], color=g, **{**LN, 'markerfacecolor': g, **st}))
         lab.append(name)
     h.append(Line2D([0], [0], color=g, **{**MODEL_LN, 'marker': 'o'}, markeredgecolor=g))
