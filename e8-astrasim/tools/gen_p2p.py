@@ -1,8 +1,9 @@
 # Chakra ET for host-interface tests: rank 0 sends COUNT messages of SIZE bytes
 # to rank 1 (all posted at once, or one after the other with --serial), or with
 # --pingpong COUNT round trips (rank 1 replies to each message; rank 0's finish
-# time / COUNT = round trip).
-#   python -I gen_p2p.py <out dir> <size> [count] [--serial|--pingpong]   -> <out dir>/p2p.{0,1}.et
+# time / COUNT = round trip). --ack (2026-10-27, the prototype's throughput test E1): after all COUNT messages rank 1
+# sends an 8 B acknowledgement, and rank 0 finishes once it has it (and its sends are released).
+#   python -I gen_p2p.py <out dir> <size> [count] [--serial|--pingpong|--ack]   -> <out dir>/p2p.{0,1}.et
 import sys, os
 sys.path.insert(0, "/scratch/harshanavkis/loom-proj/opus-ref/Opus/simulation/symbolic_tensor_graph/symbolic_tensor_graph/chakra/backends/chakra_00_4_backend/et_def")
 import et_def_pb2 as pb
@@ -29,6 +30,15 @@ if "--pingpong" in sys.argv:
     write(0, [node(i, "send" if i % 2 else "recv", "comm_dst" if i % 2 else "comm_src", 1) for i in range(1, 2 * count + 1)])
     write(1, [node(i, "recv" if i % 2 else "send", "comm_src" if i % 2 else "comm_dst", 0) for i in range(1, 2 * count + 1)])
     print(f"{out}: {count} round trips of {size} B")
+    sys.exit(0)
+if "--ack" in sys.argv:
+    ack = count + 1
+    a0, a1 = node(ack, "recv", "comm_src", 1), node(ack, "send", "comm_dst", 0)
+    a0.attr[0].int64_val = a1.attr[0].int64_val = 8
+    a1.ctrl_deps.extend(range(1, count + 1))
+    write(0, [node(i, "send", "comm_dst", 1) for i in range(1, count + 1)] + [a0])
+    write(1, [node(i, "recv", "comm_src", 0) for i in range(1, count + 1)] + [a1])
+    print(f"{out}: {count} x {size} B, all at once, then an 8 B ack")
     sys.exit(0)
 write(0, [node(i, "send", "comm_dst", 1) for i in range(1, count + 1)])
 write(1, [node(i, "recv", "comm_src", 0) for i in range(1, count + 1)])

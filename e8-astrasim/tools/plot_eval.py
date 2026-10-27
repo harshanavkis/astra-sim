@@ -257,7 +257,7 @@ H5 = ('e5_ptdma/20261020_2218_e5fin', 'e5_ptdma/20261020_1922_e5pp')
 # 2026-10-19 night (owner): the model validated on the prototype, drawn next to the measurements (hollow markers, dotted):
 # ~/loom-experiments/val_model/run_val.py (the NIC model at the prototype's links, one fitted link delay); runs/current ->
 # the run used in the paper. compare.tsv rows: exp, system, point, metric, measured, model, err_pct.
-VAL = 'val_model/runs_an/current/compare.tsv' if AN else 'val_model/runs/current/compare.tsv'
+VAL = 'val_model/runs_astra/current/compare.tsv'   # 2026-10-27 (owner: every model number through ASTRA-sim; run_val_astra.py); was runs_an/current (an_replay) / runs/current (ns-3)
 MODEL_STYLE = dict(linestyle=':', markerfacecolor='white', markeredgewidth=2, zorder=5)
 
 
