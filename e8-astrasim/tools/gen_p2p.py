@@ -3,12 +3,18 @@
 # --pingpong COUNT round trips (rank 1 replies to each message; rank 0's finish
 # time / COUNT = round trip). --ack (2026-10-27, the prototype's throughput test E1): after all COUNT messages rank 1
 # sends an 8 B acknowledgement, and rank 0 finishes once it has it (and its sends are released).
-#   python -I gen_p2p.py <out dir> <size> [count] [--serial|--pingpong|--ack]   -> <out dir>/p2p.{0,1}.et
+# --pre NS (2026-10-27, Fig 11 through ASTRA-sim instead of an_replay): rank 0 computes NS ns (num_ops = NS; run with a
+# roofline system file at 1 op per ns) before its sends, the GPU's work per message (RDMA's post call, Loom's stores).
+#   python -I gen_p2p.py <out dir> <size> [count] [--serial|--pingpong|--ack] [--pre NS]   -> <out dir>/p2p.{0,1}.et
 import sys, os
 sys.path.insert(0, "/scratch/harshanavkis/loom-proj/opus-ref/Opus/simulation/symbolic_tensor_graph/symbolic_tensor_graph/chakra/backends/chakra_00_4_backend/et_def")
 import et_def_pb2 as pb
 from google.protobuf.internal.encoder import _VarintBytes
-args = [a for a in sys.argv[1:] if not a.startswith("--")]
+argv = sys.argv[1:]
+PRE = 0
+if "--pre" in argv:
+    k = argv.index("--pre"); PRE = int(argv[k + 1]); del argv[k:k + 2]
+args = [a for a in argv if not a.startswith("--")]
 out, size = args[0], int(args[1]); count = int(args[2]) if len(args) > 2 else 1
 serial = "--serial" in sys.argv
 os.makedirs(out, exist_ok=True)
@@ -40,6 +46,15 @@ if "--ack" in sys.argv:
     write(1, [node(i, "recv", "comm_src", 0) for i in range(1, count + 1)] + [a1])
     print(f"{out}: {count} x {size} B, all at once, then an 8 B ack")
     sys.exit(0)
-write(0, [node(i, "send", "comm_dst", 1) for i in range(1, count + 1)])
+sends = [node(i, "send", "comm_dst", 1) for i in range(1, count + 1)]
+if PRE:
+    pre = pb.Node(id=count + 1, name="pre", type=pb.COMP_NODE)
+    pre.attr.add(name="num_ops", int64_val=PRE)
+    pre.attr.add(name="tensor_size", int64_val=1)
+    pre.attr.add(name="is_cpu_op", bool_val=False)
+    for nd in sends:
+        nd.ctrl_deps.append(count + 1)
+    sends = [pre] + sends
+write(0, sends)
 write(1, [node(i, "recv", "comm_src", 0) for i in range(1, count + 1)])
 print(f"{out}: {count} x {size} B, {'serial' if serial else 'all at once'}")

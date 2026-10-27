@@ -19,7 +19,9 @@ top-8, 128 heads, q_lora 1536, kv_lora 512, rope 64, nope 128, v_head 128, vocab
   gen_decode.py <out dir> <EP = GPUs> <tokens per GPU T> <context L> <micro-batches 1|2>   -> <out>/decode.<rank>.et
 LOOP=<dispatch ns>,<combine ns> (owner 2026-10-22): the GPU is busy for its measured send loop (Section 2's harness) after
 the attention (dispatch) and the experts (combine); the shared expert, the experts and the next layer wait for it. The
-network config spreads the loop's posts (POST_LOOP_NS). Without LOOP the traces are as before (byte-identical)."""
+network config spreads the loop's posts (POST_LOOP_NS). Without LOOP the traces are as before (byte-identical).
+NOREUSE=1 (2026-10-27, owner: RDMA's best case at scale, never waiting for a completion): a send does not depend on the
+same kind of sends two layers back (no buffer-reuse wait). Without it the traces are as before (byte-identical)."""
 import os, sys
 sys.path.insert(0, "/scratch/harshanavkis/loom-proj/opus-ref/Opus/simulation/symbolic_tensor_graph/symbolic_tensor_graph/chakra/backends/chakra_00_4_backend/et_def")
 import et_def_pb2 as pb
@@ -53,6 +55,7 @@ def experts(g, t, l):
 
 out, ep, T, L, MB = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
 LOOP = tuple(float(x) for x in os.environ['LOOP'].split(',')) if os.environ.get('LOOP') else None   # ns
+REUSE = os.environ.get('NOREUSE') != '1'   # 2026-10-27: NOREUSE=1 drops the buffer-reuse dependency
 assert E % ep == 0 and MB in (1, 2) and T >= MB
 os.makedirs(out, exist_ok=True)
 per = E // ep
@@ -117,7 +120,7 @@ for m in range(MB):
         dtag, ctag = 1 + 1000 * m + l, 100001 + 1000 * m + l
         rx = {r: [] for r in range(ep)}
         for (g, d), k in sorted(n.items()):
-            sid = comm(g, "send", d, k * DTOK, dtag, [a[g]] + sends.get((g, "d", l - 2), []))
+            sid = comm(g, "send", d, k * DTOK, dtag, [a[g]] + (sends.get((g, "d", l - 2), []) if REUSE else []))
             sends.setdefault((g, "d", l), []).append(sid)
             rx[d].append(comm(d, "recv", g, k * DTOK, dtag))
             msgs += 1
@@ -128,7 +131,7 @@ for m in range(MB):
         sh = {r: comp(r, f"shared{l}", 2 * b * EXP_W, EXP_W + 4 * b * H, [a[r]] + busy[r]) for r in range(ep)}
         crx = {r: [] for r in range(ep)}
         for (g, d), k in sorted(n.items()):                # combine: d returns g's tokens
-            sid = comm(d, "send", g, k * CTOK, ctag, [ex[d]] + sends.get((d, "c", l - 2), []))
+            sid = comm(d, "send", g, k * CTOK, ctag, [ex[d]] + (sends.get((d, "c", l - 2), []) if REUSE else []))
             sends.setdefault((d, "c", l), []).append(sid)
             crx[g].append(comm(g, "recv", d, k * CTOK, ctag))
             msgs += 1
