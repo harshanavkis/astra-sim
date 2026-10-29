@@ -316,7 +316,9 @@ def strip_a3(out):
     # (a) one-way latency
     SIZES = (0, 64, 256, 1024, 4096, 16384, 65536)
     ax = axes[0]
-    for k, color, st in (('h_rdma1', RDMA, ENG), ('h_rdma1_stg', RDMA, STAGED), ('h_ptdma', LOOM, ENG), ('h_stores', LOOM, CPU)):
+    # 2026-10-28 (owner: "CPU copy first" adds no value, confuses the legend): RDMA staged by the CPU dropped from (a) and (b)
+    # (h_rdma1_stg / rdma_stg); backup plot_strips.py.pre_nostaged_20261028.
+    for k, color, st in (('h_rdma1', RDMA, ENG), ('h_ptdma', LOOM, ENG), ('h_stores', LOOM, CPU)):
         plot(ax, SIZES, [x[0] if x else np.nan for x in pe.lat(k, SIZES)], color, st)
     for sy, color, st in (('rdma', RDMA, ENG), ('loom_stores', LOOM, CPU)):
         plot(ax, SIZES, [V.get(('e2', sy, str(s), 'oneway_us'), np.nan) for s in SIZES], color, {**MODEL_LN, 'marker': st['marker']},
@@ -333,8 +335,6 @@ def strip_a3(out):
         plot(ax, sizes, [t[1] for t in d[key]], color, ENG)
         plot(ax, sizes, [V.get(('e1', key, str(s), 'gbps'), np.nan) for s in sizes], color, {**MODEL_LN, 'marker': 'D'},
              markeredgecolor=color)
-    stg = dict((t[0], t[1]) for t in d.get('rdma_stg', ()))
-    plot(ax, sizes, [stg.get(s, np.nan) for s in sizes], RDMA, STAGED)
     ax.set_ylim(0, 14)
     ax.set_yticks((0, 5, 10))
     size_ticks(ax, sizes)
@@ -363,7 +363,7 @@ def strip_a3(out):
     g = '0.25'
     h = [Line2D([0], [0], color=RDMA, linewidth=1.6), Line2D([0], [0], color=LOOM, linewidth=1.6)]
     lab = ['RDMA', 'Loom']
-    for st, name in ((ENG, 'NIC or copy engine'), (CPU, 'CPU stores or loads'), (STAGED, 'CPU copy first'),
+    for st, name in ((ENG, 'NIC or copy engine'), (CPU, 'CPU stores or loads'),
                      (R256, 'READ per 4 KiB' if reads_chunk() == 4096 else f'READ per {reads_chunk()} B'), ({**NORA3, 'markerfacecolor': '0.85'}, 'no read-ahead')):
         h.append(Line2D([0], [0], color=g, **{**LN, 'markerfacecolor': g, **st}))
         lab.append(name)
