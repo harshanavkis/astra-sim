@@ -326,26 +326,46 @@ void hif_rx_done(uint32_t sip, uint32_t dip, uint16_t sport, uint64_t size) {
   flow_maybe_done(key);
 }
 
-// loom branch: a message between two GPUs of one server takes NVLink, not
-// ns-3: it holds the sender's and the receiver's NVLink port for size / bw
-// (the NVSwitch itself does not block); the receiver has it nvlink_lat_ns later.
+// loom branch: a message between two GPUs of one server takes NVLink, not ns-3 (the NVSwitch itself does not
+// block); the receiver has it nvlink_lat_ns after its last byte. Messages in flight together SHARE a GPU's NVLink
+// port: each reserves the sender's and the receiver's port one piece (NVL_PIECE_BYTES) at a time and queues again
+// after every piece, so concurrent messages take turns at the full rate. (Before 2026-10-20 a message held both
+// ports for its whole size in issue order: an early-issued collective blocked a later one on the critical path.)
 vector<uint64_t> nvl_tx_free, nvl_rx_free;
+uint64_t nvl_piece_bytes = 262144;
+struct NvlMsg {
+  int src, dst, tag;
+  uint64_t size, left;
+  void (*msg_handler)(void *fun_arg);
+  void *fun_arg;
+};
+void nvl_piece(NvlMsg *m) {
+  uint64_t now = Simulator::Now().GetNanoSeconds();
+  uint64_t b = min(nvl_piece_bytes, m->left);
+  uint64_t start = max(now, max(nvl_tx_free[m->src], nvl_rx_free[m->dst]));
+  uint64_t end = start + (uint64_t)ceil(b / nvlink_gbps); // GB/s = B/ns
+  nvl_tx_free[m->src] = nvl_rx_free[m->dst] = end;
+  m->left -= b;
+  if (m->left > 0) {
+    Simulator::Schedule(NanoSeconds(end - now), &nvl_piece, m);
+    return;
+  }
+  Simulator::Schedule(NanoSeconds(end - now), [m]() {
+    rank_last_release[m->src] = Simulator::Now().GetNanoSeconds();
+    m->msg_handler(m->fun_arg);
+  });
+  Simulator::Schedule(NanoSeconds(end + (uint64_t)nvlink_lat_ns - now), [m]() {
+    notify_receiver_receive_data(m->src, m->dst, (int)m->size, m->tag);
+    delete m;
+  });
+}
 void local_send(int src, int dst, uint64_t size, void (*msg_handler)(void *fun_arg),
                 void *fun_arg, int tag) {
   if (nvl_tx_free.size() <= (size_t)max(src, dst)) {
     nvl_tx_free.resize(max(src, dst) + 1, 0);
     nvl_rx_free.resize(max(src, dst) + 1, 0);
   }
-  uint64_t now = Simulator::Now().GetNanoSeconds();
-  uint64_t start = max(now, max(nvl_tx_free[src], nvl_rx_free[dst]));
-  uint64_t end = start + (uint64_t)ceil(size / nvlink_gbps); // GB/s = B/ns
-  nvl_tx_free[src] = nvl_rx_free[dst] = end;
-  Simulator::Schedule(NanoSeconds(end - now), [src, msg_handler, fun_arg]() {
-    rank_last_release[src] = Simulator::Now().GetNanoSeconds();
-    msg_handler(fun_arg);
-  });
-  Simulator::Schedule(NanoSeconds(end + (uint64_t)nvlink_lat_ns - now),
-                      &notify_receiver_receive_data, src, dst, (int)size, tag);
+  nvl_piece(new NvlMsg{src, dst, tag, size, size, msg_handler, fun_arg});
 }
 
 // loom branch: a message split into puts (MSG_SPLIT_BYTES); the sender is done
